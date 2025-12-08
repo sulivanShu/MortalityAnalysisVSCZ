@@ -1,3 +1,3 @@
 @info "Download data"
-DownloadCheck(czech_data_csv, czech_data_csv_url)
+DownloadCheck(CZECH_DATA_CSV, CZECH_DATA_CSV_URL)
 @info "Download completed"

@@ -105,16 +105,16 @@ end
 
 # weekly_entries.jl
 
-function create_weekly_entries(entries::Vector{Date}, subgroup_id::Int64,
-		these_mondays::Vector{Date}, mondays::Vector{Date}, dfs::Dict{Int64, DataFrame})
+function create_weekly_entries(ENTRIES::Vector{Date}, subgroup_id::Int64,
+		these_mondays::Vector{Date}, MONDAYS::Vector{Date}, dfs::Dict{Int64, DataFrame})
 	subgroup = deepcopy(dfs[subgroup_id]) # créée une vraie copie, pour les tests. subgroup est modifié, il faut le redéfinir à chaque exécution.
 	weekly_entries = Dict(entry => DataFrame(vaccinated=Bool[],
 																					 entry=Date[],
 																					 exit=Date[],
 																					 death=Date[])
-												for entry in entries)
+												for entry in ENTRIES)
 	when_what_where_dict = Dict{Date, Dict{Date, Vector{Int}}}()
-	for this_monday in mondays
+	for this_monday in MONDAYS
 		if this_monday in these_mondays
 			weekly_entry = weekly_entries[this_monday]
 			# Pour les vaccinés
@@ -151,7 +151,7 @@ function process_vaccinated!(
 																		exit = this_monday + Week(53),
 																		death = row.week_of_death
 																		))
-			row.available = unavailable
+			row.available = UNAVAILABLE
 		end
 	end
 	return nrow(weekly_entry) # renvoie le nombre de vaccinés ajoutés à entry

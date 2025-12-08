@@ -1,10 +1,10 @@
-@info "Loading variables"
-czech_data_csv = "data/exp_raw/Otevrena-data-NR-26-30-COVID-19-prehled-populace-2024-01.csv"
-czech_data_csv_url = "https://data.mzcr.cz/data/distribuce/402/Otevrena-data-NR-26-30-COVID-19-prehled-populace-2024-01.csv"
-czech_data_csv_b3sum = "28a58ec2c8360cdf4ae599cc59bd6e8c678aa7ccbab7debc5d3c3faf645dfcd6"
-dummy_hash = "0000000000000000000000000000000000000000000000000000000000000000"
-czech_data_csv_quote = "Šanca O., Jarkovský J., Klimeš D., Zelinková H., Klika P., Benešová K., Mužík J., Komenda M., Dušek L. Očkování, pozitivity, hospitalizace pro COVID-19, úmrtí, long covid a komorbidity u osob v ČR. Národní zdravotnický informační portál [online]. Praha: Ministerstvo zdravotnictví ČR a Ústav zdravotnických informací a statistiky ČR, 2024 [cit. 2025-09-29]. Dostupné z: http://www.nzip.cz/data/2135-covid-19-prehled-populace. ISSN 2695-0340"
-my_czech_header = [
+@info "Loading constantes"
+const CZECH_DATA_CSV = "data/exp_raw/Otevrena-data-NR-26-30-COVID-19-prehled-populace-2024-01.csv"
+const CZECH_DATA_CSV_URL = "https://data.mzcr.cz/data/distribuce/402/Otevrena-data-NR-26-30-COVID-19-prehled-populace-2024-01.csv"
+const CZECH_DATA_CSV_B3SUM = "28a58ec2c8360cdf4ae599cc59bd6e8c678aa7ccbab7debc5d3c3faf645dfcd6"
+const DUMMY_HASH = "0000000000000000000000000000000000000000000000000000000000000000"
+const CZECH_DATA_CSV_QUOTE = "Šanca O., Jarkovský J., Klimeš D., Zelinková H., Klika P., Benešová K., Mužík J., Komenda M., Dušek L. Očkování, pozitivity, hospitalizace pro COVID-19, úmrtí, long covid a komorbidity u osob v ČR. Národní zdravotnický informační portál [online]. Praha: Ministerstvo zdravotnictví ČR a Ústav zdravotnických informací a statistiky ČR, 2024 [cit. 2025-09-29]. Dostupné z: http://www.nzip.cz/data/2135-covid-19-prehled-populace. ISSN 2695-0340"
+const MY_CZECH_HEADER = [
 									 "Infekce",
 									 "Pohlavi",
 									 "RokNarozeni",
@@ -17,7 +17,7 @@ my_czech_header = [
 									 "Datum_Sedma_davka",
 									 "DatumUmrtiLPZ"
 									 ]
-my_english_header = [
+const MY_ENGLISH_HEADER = [
 										 "infection_rank",
 										 "sex",
 										 "_5_years_cat_of_birth",
@@ -30,16 +30,17 @@ my_english_header = [
 										 "week_of_dose7",
 										 "week_of_death"
 										 ]
-unvaccinated = Date("10000-01-01")
-still_alive = Date("10000-01-01")
-available = Date("-10000-01-01")
-unavailable = Date("10000-01-01")
-first_monday = Date("2020-12-21")
-last_monday = Date("2024-06-24")
-mondays = collect(first_monday:Week(1):last_monday)
-year_week = ["week_of_dose1", "week_of_death"]
-year_year = ["_5_years_cat_of_birth"]
-english_header = [
+const UNVACCINATED = Date("10000-01-01")
+const STILL_ALIVE = Date("10000-01-01")
+const AVAILABLE = Date("-10000-01-01")
+const UNAVAILABLE = Date("10000-01-01")
+const FIRST_MONDAY = Date("2020-12-21")
+const LAST_MONDAY = Date("2024-06-24")
+const MONDAYS = collect(FIRST_MONDAY:Week(1):LAST_MONDAY)
+const ENTRIES = first(MONDAYS, length(MONDAYS)-53)
+const YEAR_WEEK = ["week_of_dose1", "week_of_death"]
+const YEAR_YEAR = ["_5_years_cat_of_birth"]
+const ENGLISH_HEADER = [
 									"id", # unique row identifier, numeric
 									"infection_rank", # infection order of the patient, numeric
 									"sex", # sex of the patient: 1=male, 2=female, NULL=unknown
@@ -94,7 +95,7 @@ english_header = [
 									"long_covid", # week of first long COVID report, string
 									"DCCI" # comorbidity index at positivity, numeric
 								 ]
-czech_header = [
+const CZECH_HEADER = [
 								"ID", # unique row identifier, numeric
 								"Infekce", # infection order of the patient, numeric
 								"Pohlavi", # sex of the patient: 1=male, 2=female, NULL=unknown
@@ -149,4 +150,4 @@ czech_header = [
 								"Long_COVID", # week of first long COVID report, string
 								"DCCI" # comorbidity index at positivity, numeric
 							 ]
-@info "Variables loaded"
+@info "Constantes loaded"

@@ -1,3 +1,3 @@
 @info "Translating header"
-rename!(dfs, my_czech_header .=> my_english_header)
+rename!(dfs, MY_CZECH_HEADER .=> MY_ENGLISH_HEADER)
 @info "Header translation completed"
