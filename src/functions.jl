@@ -104,8 +104,9 @@ function modify_df!(df::DataFrame)
 end
 
 # weekly_entries.jl
+
 function create_weekly_entries(entries::Vector{Date}, subgroup_id::Int64,
-		these_mondays::Vector{Date})
+		these_mondays::Vector{Date}, mondays::Vector{Date}, dfs::Dict{Int64, DataFrame})
 	subgroup = deepcopy(dfs[subgroup_id]) # créée une vraie copie, pour les tests. subgroup est modifié, il faut le redéfinir à chaque exécution.
 	weekly_entries = Dict(entry => DataFrame(vaccinated=Bool[],
 																					 entry=Date[],
