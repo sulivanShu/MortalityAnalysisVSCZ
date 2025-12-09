@@ -105,8 +105,11 @@ end
 
 # weekly_entries.jl
 
-function create_weekly_entries(ENTRIES::Vector{Date}, subgroup_id::Int64,
-		these_mondays::Vector{Date}, MONDAYS::Vector{Date}, dfs::Dict{Int64, DataFrame})
+function create_weekly_entries(ENTRIES::Vector{Date},
+		subgroup_id::Int64,
+		these_mondays::Vector{Date},
+		MONDAYS::Vector{Date},
+		dfs::Dict{Int64, DataFrame})
 	subgroup = deepcopy(dfs[subgroup_id]) # créée une vraie copie, pour les tests. subgroup est modifié, il faut le redéfinir à chaque exécution.
 	weekly_entries = Dict(entry => DataFrame(vaccinated=Bool[],
 																					 entry=Date[],
@@ -175,10 +178,10 @@ function process_first_unvaccinated!(
 											 row.available < entry,
 											 eachrow(subgroup))
 		if !isempty(eligible) && length(eligible) < vaccinated_count
-			@error "$this_monday: Moins de non-vaccinés que de vaccinés pour entry = $entry"
+			error("$this_monday: Moins de non-vaccinés que de vaccinés pour entry = $entry")
 		end
 		if isempty(eligible)
-			@error "$this_monday: Aucun non-vacciné éligible pour entry = $entry"
+			error("$this_monday: Aucun non-vacciné éligible pour entry = $entry")
 		end
 		# numéros de lignes, qui sont sélectionnées:
 		selected = sample(eligible, min(vaccinated_count, length(eligible)), replace=false)
@@ -263,9 +266,9 @@ function replace_unvaccinated!(
 	for (_what, _where) in inner_dict
 		if length(eligible) < length(_where)
 			if isempty(eligible)
-				@error "$this_monday: Replacement impossible in $(_what)! `eligible` is empty!"
+				error("$this_monday: Replacement impossible in $(_what)! `eligible` is empty!")
 			else
-				@error "$this_monday: Replacement impossible in $(_what)! `eligible` is lesser than length(_where)!"
+				error("$this_monday: Replacement impossible in $(_what)! `eligible` is lesser than length(_where)!")
 			end
 		end
 		if length(eligible) >= length(_where)
