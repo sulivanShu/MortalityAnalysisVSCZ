@@ -103,14 +103,71 @@ function modify_df!(df::DataFrame)
 	select!(df, Not(:infection_rank))
 end
 
-# weekly_entries.jl
+# select.jl
+function select_weekly_entries(ENTRIES, APPROXIMATE_SELECTION, subgroup_id; maxk=53)
+	tail = ENTRIES[54:131]
+	weekly_entries = nothing
+	# ok = APPROXIMATE_SELECTION[subgroup_id]
+	these_mondays = vcat(ENTRIES[1:APPROXIMATE_SELECTION[subgroup_id]], tail)
+	try
+		# Random.seed!(0)
+		weekly_entries =
+		create_weekly_entries(ENTRIES,
+													subgroup_id,
+													these_mondays,
+													MONDAYS,
+													dfs)
+		# @info "subgroup_id = $subgroup_id\nWe are bellow at $(ok)!"
+		if APPROXIMATE_SELECTION[subgroup_id] < maxk
+			next_approximate_selection = APPROXIMATE_SELECTION[subgroup_id] + 1
+			for k in next_approximate_selection:maxk
+				these_mondays = vcat(ENTRIES[1:k], tail)
+				try
+					# Random.seed!(0)
+					weekly_entries =
+					create_weekly_entries(ENTRIES,
+																subgroup_id,
+																these_mondays,
+																MONDAYS,
+																dfs)
+				catch
+					@info "subgroup_id = $subgroup_id\nweekly_entries selected from below: [1:$k, 54:131]"
+					break
+				end
+			end
+		else # APPROXIMATE_SELECTION[subgroup_id] == maxk
+			@info "subgroup_id = $subgroup_id\nweekly_entries total selection: [1:131]"
+			return weekly_entries
+		end
+	catch
+		# @info "subgroup_id = $subgroup_id\nWe are above at $(ok)!"
+		previous_approximate_selection = APPROXIMATE_SELECTION[subgroup_id] - 1
+		for k in previous_approximate_selection:-1:0
+				these_mondays = vcat(ENTRIES[1:k], tail)
+				try
+					Random.seed!(0)
+					weekly_entries =
+					create_weekly_entries(ENTRIES,
+																subgroup_id,
+																these_mondays,
+																MONDAYS,
+																dfs)
+					@info "subgroup_id = $subgroup_id\nweekly_entries selected from above: [1:$k, 54:131]"
+					return weekly_entries
+				catch
+				end
+		end
+	end
+	return weekly_entries
+end
 
 function create_weekly_entries(ENTRIES::Vector{Date},
 		subgroup_id::Int64,
 		these_mondays::Vector{Date},
 		MONDAYS::Vector{Date},
 		dfs::Dict{Int64, DataFrame})
-	subgroup = deepcopy(dfs[subgroup_id]) # créée une vraie copie, pour les tests. subgroup est modifié, il faut le redéfinir à chaque exécution.
+	# subgroup = deepcopy(dfs[subgroup_id]) # créée une vraie copie, pour les tests. subgroup est modifié, il faut le redéfinir à chaque exécution.
+	subgroup = dfs[subgroup_id] # pas une vraie copie.
 	weekly_entries = Dict(entry => DataFrame(vaccinated=Bool[],
 																					 entry=Date[],
 																					 exit=Date[],
@@ -137,8 +194,8 @@ function create_weekly_entries(ENTRIES::Vector{Date},
 													weekly_entries,
 													when_what_where_dict)
 	end
+	filter!(kv -> nrow(kv[2]) > 0, weekly_entries)
 	return weekly_entries
-	# TODO return when_what_where_dict et autre chose?
 end
 
 function process_vaccinated!(
