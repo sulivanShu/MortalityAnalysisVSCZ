@@ -170,11 +170,14 @@ function create_subgroups(ENTRIES::Vector{Date},
 	group = deepcopy(dfs[group_id])
 	# TODO: pas une vraie copie.
 	# group = dfs[group_id]
-	subgroups = Dict(entry => DataFrame(vaccinated=Bool[],
-																					 entry=Date[],
-																					 exit=Date[],
-																					 death=Date[])
-												for entry in ENTRIES)
+	subgroups = Dict(entry => DataFrame(
+																			vaccinated = Bool[],
+																			entry = Date[],
+																			exit = Date[],
+																			death = Date[],
+																			DCCI = Vector{Tuple{Date, Int}}[],
+																			)
+									 for entry in ENTRIES)
 	when_what_where_dict = Dict{Date, Dict{Date, Vector{Int}}}()
 	for this_monday in MONDAYS
 		if this_monday in these_mondays
@@ -197,6 +200,7 @@ function create_subgroups(ENTRIES::Vector{Date},
 													when_what_where_dict)
 	end
 	filter!(kv -> nrow(kv[2]) > 0, subgroups)
+	# return subgroups, when_what_where_dict # TEST: on peut ne pas renvoyer when_what_where_dict
 	return subgroups
 end
 
@@ -207,11 +211,17 @@ function process_vaccinated!(
 	# INFO: Repérer dans `group` les vaccinés du `subgroup` en cours, puis les mettre dans subgroups[entry], puis les marquer comme non-disponibles dans `group`.
 	for row in eachrow(group)
 		if row.week_of_dose1 == this_monday
+			vaccinated = true
+			entry = this_monday
+			exit = this_monday + Week(53) # INFO: 53 semaines en tout
+			death = row.week_of_death
+			DCCI = [(this_monday, row.DCCI)] # TEST: remplacement par la valeur de DCCI
 			push!(subgroup, (
-																		vaccinated = true,
-																		entry = this_monday,
-																		exit = this_monday + Week(53),
-																		death = row.week_of_death
+																		vaccinated = vaccinated,
+																		entry = entry,
+																		exit = exit,
+																		death = death,
+																		DCCI = DCCI,
 																		))
 			row.available = UNAVAILABLE
 		end
@@ -249,13 +259,18 @@ function process_first_unvaccinated!(
 			# INFO: Chaque ligne sélectionnée dans group:
 			row = group[i, :]
 			# INFO: un non-vaccinés sort soit à la fin de la subgroup, soit au moment de sa vaccination.
+			vaccinated = false
+			entry = this_monday
 			exit = min(row.week_of_dose1, this_monday + Week(53))
+			death = row.week_of_death
+			DCCI = [(this_monday, row.DCCI)] # TEST: remplacement par la valeur de DCCI
 			push!(subgroup, (
-													 vaccinated = false,
-													 entry = this_monday,
-													 exit = exit,
-													 death = row.week_of_death
-													 ))
+																		vaccinated = vaccinated,
+																		entry = entry,
+																		exit = exit,
+																		death = death,
+																		DCCI = DCCI,
+																		))
 			# INFO: Un non-vaccinés redevient disponible soit lorsqu'il est vaccinés, soit lorsqu'il sort de la subgroup. Attention, il pourrait être "disponible", après sa mort, d'où l'importance de vérifier si les non-vaccinés ne sont pas mort, avant d'intégrer ou de réintégrer une subgroup!
 			group[i, :available] = exit + Week(1)
 		end
@@ -295,23 +310,12 @@ function replace_unvaccinated!(
 		subgroups::Dict{Date, DataFrame},
 		when_what_where_dict::Dict{Date, Dict{Date, Vector{Int}}}
 		)
-	# rien à faire si aucun remplacement planifié pour ce this_monday
+	# rien à faire si aucun remplacement planifié pour this_monday
 	if !haskey(when_what_where_dict, this_monday)
 		return nothing
 	end
 	_when = this_monday
 	inner_dict = when_what_where_dict[_when]
-	# TODO supprimer ces commentaires? ces trucs sont-ils vraiment utiles? il vaut mieux utiliser la macro @debug
-	## affichage lisible du dictionnaire imbriqué (optionnel, utile pour debug)
-	# rows = [
-	# 				(outer_date = outer, inner_date = inner, values = join(v, ", "))
-	# 				for (outer, inner_dict_) in when_what_where_dict
-	# 				for (inner, v) in inner_dict_
-	# 				]
-	# df_info = DataFrame(rows)
-	# df_info_for_this_monday = filter(row -> row.outer_date == _when, df_info)
-	# @info "$_when: état de when_what_where_dict:" df_info_for_this_monday
-	# @info "$this_monday: Remplacements à faire"
 	# Les éligibles doivent être calculés dans chaque fonction `process_first_unvaccinated` et `replace_unvaccinated`.
 	eligible = findall(row ->
 										 # Sont éligibles, à la date de remplacement:
@@ -325,27 +329,25 @@ function replace_unvaccinated!(
 										 )
 	for (_what, _where) in inner_dict
 		if length(eligible) < length(_where)
-			if isempty(eligible)
-				error("$this_monday: Replacement impossible in $(_what)! `eligible` is empty!")
-			else
-				error("$this_monday: Replacement impossible in $(_what)! `eligible` is lesser than length(_where)!")
-			end
+			error("$this_monday: Impossible replacement in $(_what)! `eligible` is lesser than length(_where)!")
 		end
 		if length(eligible) >= length(_where)
 			selected = sample(eligible, length(_where), replace=false)
-			for i in selected
-				row = group[i, :]
+			for i in selected # INFO: `i` is each column of `selected`
+				row = group[i, :] # INFO: select all columns of line `i` of `group`
 				exit = min(row.week_of_dose1, _what + Week(53))
 				group[i, :available] = exit + Week(1)
 			end
 			subgroup = subgroups[_what]
-			for (k, i) in enumerate(_where)
-				s = selected[k]
+			for (k, i) in enumerate(_where) # INFO: `i` have each `_where` value, and `k` is the range of `i` [1, 2, 3...].
+				s = selected[k] # un individu de remplacement
 				subgroup_end = _what + Week(53)
 				vaccination_date = group[s, :week_of_dose1]
 				exit = min(subgroup_end, vaccination_date)
+				death = group[s, :week_of_death]
 				subgroup.exit[i]  = exit
-				subgroup.death[i] = group[s, :week_of_death]
+				subgroup.death[i] = death
+				push!(subgroup.DCCI[i], (this_monday, group[s, :DCCI]))  # TEST: remplacement par la valeur de DCCI
 				if vaccination_date <= subgroup_end # Même chose que dans la fonction `process_first_unvaccinated`
 					@chain begin
 						# dans when_what_where_dict (un dictionnaire)
