@@ -175,7 +175,7 @@ function create_subgroups(ENTRIES::Vector{Date},
 																			entry = Date[],
 																			exit = Date[],
 																			death = Date[],
-																			DCCI = Vector{Tuple{Date, Int}}[],
+																			DCCI = Vector{Tuple{Int, Date}}[],
 																			)
 									 for entry in ENTRIES)
 	when_what_where_dict = Dict{Date, Dict{Date, Vector{Int}}}()
@@ -215,7 +215,7 @@ function process_vaccinated!(
 			entry = this_monday
 			exit = this_monday + Week(53) # INFO: 53 semaines en tout
 			death = row.week_of_death
-			DCCI = [(this_monday, row.DCCI)] # TEST: remplacement par la valeur de DCCI
+			DCCI = [(row.DCCI, this_monday)] # TEST: remplacement par la valeur de DCCI
 			push!(subgroup, (
 																		vaccinated = vaccinated,
 																		entry = entry,
@@ -263,7 +263,7 @@ function process_first_unvaccinated!(
 			entry = this_monday
 			exit = min(row.week_of_dose1, this_monday + Week(53))
 			death = row.week_of_death
-			DCCI = [(this_monday, row.DCCI)] # TEST: remplacement par la valeur de DCCI
+			DCCI = [(row.DCCI, this_monday)] # TEST: remplacement par la valeur de DCCI
 			push!(subgroup, (
 																		vaccinated = vaccinated,
 																		entry = entry,
@@ -347,7 +347,7 @@ function replace_unvaccinated!(
 				death = group[s, :week_of_death]
 				subgroup.exit[i]  = exit
 				subgroup.death[i] = death
-				push!(subgroup.DCCI[i], (this_monday, group[s, :DCCI]))  # TEST: remplacement par la valeur de DCCI
+				push!(subgroup.DCCI[i], (group[s, :DCCI], this_monday))  # TEST: remplacement par la valeur de DCCI
 				if vaccination_date <= subgroup_end # Même chose que dans la fonction `process_first_unvaccinated`
 					@chain begin
 						# dans when_what_where_dict (un dictionnaire)
@@ -372,33 +372,71 @@ function dcci_treatment!(df::DataFrame)
 	@inbounds for i in 1:nrow(df)
 		old = df.DCCI[i]
 		n = length(old)
-		out = Vector{Tuple{Int, Int}}(undef, n)
+		new = Vector{Tuple{Int, Int}}(undef, n)
 		if n == 1
-			out[1] = (1, old[1][2])
+			# une seule paire → durée = 1
+			new[1] = (old[1][1], 1)  # old[1][1] = dcci_code
 		else
-			first_is_special = (old[1][1] == VERY_FIRST_ENTRY)
+			# la première date de DCCI
+			first_date = old[1][2]
+			first_is_special = (first_date == VERY_FIRST_ENTRY)
 			for j in 1:n
-				(original_date, dcci) = old[j]
+				(dcci_code, date) = old[j]
 				# ajustement de la date courante
 				adjustment = (j == 1 && first_is_special) ? Day(6) : Day(3)
-				current_date = original_date + adjustment
+				current_date = date + adjustment
 				if j < n
-					next_date = old[j+1][1] + Day(3)
-					out[j] = (Dates.value(next_date - current_date), dcci)
+					next_date = old[j+1][2] + Day(3)
+					new[j] = (dcci_code, Dates.value(next_date - current_date))
 				else
 					if first_is_special
 						end_date = min(df.exit[i], df.death[i] + Day(3))
 					else
 						end_date = min(df.exit[i] - Day(3), df.death[i] + Day(3))
 					end
-					out[j] = (Dates.value(end_date - current_date), dcci)
+					new[j] = (dcci_code, Dates.value(end_date - current_date))
 				end
 			end
 		end
-		newcol[i] = out
+		newcol[i] = new
 	end
 	df.DCCI = newcol
 	return df
 end
+
+# # dcci_treatment.jl
+# function dcci_treatment!(df::DataFrame)
+# 	newcol = Vector{Vector{Tuple{Int, Int}}}(undef, nrow(df))
+# 	@inbounds for i in 1:nrow(df)
+# 		old = df.DCCI[i]
+# 		n = length(old)
+# 		out = Vector{Tuple{Int, Int}}(undef, n)
+# 		if n == 1
+# 			out[1] = (1, old[1][2])
+# 		else
+# 			first_is_special = (old[1][1] == VERY_FIRST_ENTRY)
+# 			for j in 1:n
+# 				(original_date, dcci) = old[j]
+# 				# ajustement de la date courante
+# 				adjustment = (j == 1 && first_is_special) ? Day(6) : Day(3)
+# 				current_date = original_date + adjustment
+# 				if j < n
+# 					next_date = old[j+1][1] + Day(3)
+# 					out[j] = (Dates.value(next_date - current_date), dcci)
+# 				else
+# 					if first_is_special
+# 						end_date = min(df.exit[i], df.death[i] + Day(3))
+# 					else
+# 						end_date = min(df.exit[i] - Day(3), df.death[i] + Day(3))
+# 					end
+# 					out[j] = (Dates.value(end_date - current_date), dcci)
+# 				end
+# 			end
+# 		end
+# 		newcol[i] = out
+# 	end
+# 	df.DCCI = newcol
+# 	return df
+# end
 
 @info "Loading completed"
