@@ -372,71 +372,30 @@ function dcci_treatment!(df::DataFrame)
 	@inbounds for i in 1:nrow(df)
 		old = df.DCCI[i]
 		n = length(old)
-		new = Vector{Tuple{Int, Int}}(undef, n)
-		if n == 1
-			# une seule paire → durée = 1
-			new[1] = (old[1][1], 1)  # old[1][1] = dcci_code
-		else
-			# la première date de DCCI
-			first_date = old[1][2]
-			first_is_special = (first_date == VERY_FIRST_ENTRY)
-			for j in 1:n
-				(dcci_code, date) = old[j]
-				# ajustement de la date courante
-				adjustment = (j == 1 && first_is_special) ? Day(6) : Day(3)
-				current_date = date + adjustment
-				if j < n
-					next_date = old[j+1][2] + Day(3)
-					new[j] = (dcci_code, Dates.value(next_date - current_date))
+		# accumulation par code : 0..5 → indices 1..6
+		durations = zeros(Int, 6)
+		first_is_special = (old[1][2] == VERY_FIRST_ENTRY)
+		for j in 1:n
+			(code, date) = old[j]
+			adjustment = (j == 1 && first_is_special) ? Day(6) : Day(3)
+			current_date = date + adjustment
+			if j < n
+				end_date = old[j + 1][2] + Day(3)
+			else
+				if first_is_special
+					end_date = min(df.exit[i], df.death[i] + Day(3))
 				else
-					if first_is_special
-						end_date = min(df.exit[i], df.death[i] + Day(3))
-					else
-						end_date = min(df.exit[i] - Day(3), df.death[i] + Day(3))
-					end
-					new[j] = (dcci_code, Dates.value(end_date - current_date))
+					end_date = min(df.exit[i] - Day(3), df.death[i] + Day(3))
 				end
 			end
+			durations[code + 1] += Dates.value(end_date - current_date)
 		end
-		newcol[i] = new
+		# reconstruction
+		newcol[i] = [(code - 1, durations[code])
+								 for code in 1:6 if durations[code] > 0]
 	end
 	df.DCCI = newcol
 	return df
 end
-
-# # dcci_treatment.jl
-# function dcci_treatment!(df::DataFrame)
-# 	newcol = Vector{Vector{Tuple{Int, Int}}}(undef, nrow(df))
-# 	@inbounds for i in 1:nrow(df)
-# 		old = df.DCCI[i]
-# 		n = length(old)
-# 		out = Vector{Tuple{Int, Int}}(undef, n)
-# 		if n == 1
-# 			out[1] = (1, old[1][2])
-# 		else
-# 			first_is_special = (old[1][1] == VERY_FIRST_ENTRY)
-# 			for j in 1:n
-# 				(original_date, dcci) = old[j]
-# 				# ajustement de la date courante
-# 				adjustment = (j == 1 && first_is_special) ? Day(6) : Day(3)
-# 				current_date = original_date + adjustment
-# 				if j < n
-# 					next_date = old[j+1][1] + Day(3)
-# 					out[j] = (Dates.value(next_date - current_date), dcci)
-# 				else
-# 					if first_is_special
-# 						end_date = min(df.exit[i], df.death[i] + Day(3))
-# 					else
-# 						end_date = min(df.exit[i] - Day(3), df.death[i] + Day(3))
-# 					end
-# 					out[j] = (Dates.value(end_date - current_date), dcci)
-# 				end
-# 			end
-# 		end
-# 		newcol[i] = out
-# 	end
-# 	df.DCCI = newcol
-# 	return df
-# end
 
 @info "Loading completed"
