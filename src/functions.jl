@@ -383,9 +383,18 @@ function dcci_treatment!(df::DataFrame)
 				end_date = old[j + 1][2] + Day(3)
 			else
 				if first_is_special
-					end_date = min(df.exit[i], df.death[i] + Day(3))
+					if df.entry[i] == df.death[i]
+						end_date = df.entry[i] + Day(7)
+						@info "df.entry[i] = $(df.entry[i]); end_date = $end_date"
+					else
+						end_date = min(df.exit[i], df.death[i] + Day(3))
+					end
 				else
-					end_date = min(df.exit[i] - Day(3), df.death[i] + Day(3))
+					if df.entry[i] == df.death[i]
+						end_date = df.entry[i] + Day(7)
+					else
+						end_date = min(df.exit[i] - Day(3), df.death[i] + Day(3))
+					end
 				end
 			end
 			durations[code + 1] += Dates.value(end_date - current_date)
