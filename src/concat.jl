@@ -1,4 +1,6 @@
 @info "Concate dataframes in groups"
+
+# Processing
 exact_selection = Dict(
     ThreadsX.map(
         k -> begin
@@ -7,4 +9,5 @@ exact_selection = Dict(
         keys(exact_selection)
     )
 )
+
 @info "Concatenation completed"

@@ -1,5 +1,9 @@
 @info "Indexing data"
 
+const MISSING = Date("10000-01-01")
+const EVA = Date("10000-01-01")
+
+# Processing
 dfs = Dict(
     parse(Int, string(first(df.sex), first(df."_5_years_cat_of_birth"))) => df
     for df in dfs
@@ -12,4 +16,3 @@ ThreadsX.foreach(df -> begin
 								 end, dfs)
 
 @info "Indexing completed"
-

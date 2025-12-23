@@ -1,7 +1,6 @@
 include("src/project.jl")
 include("src/packages.jl")
-include("src/constantes.jl")
-include("src/functions.jl")
+include("src/constants.jl")
 include("src/download.jl")
 include("src/checksum.jl")
 include("src/load.jl")
