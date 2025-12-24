@@ -1,4 +1,4 @@
-@info "Formatting data (parallel)"
+@info "Formatting data"
 
 # Functions
 function convert_to_uint8!(df::DataFrame, col::Symbol)
@@ -39,4 +39,4 @@ ThreadsX.foreach(subdf -> begin
 									 isoweek_to_date!(subdf, :week_of_death)
 									end, dfs)
 
-@info "Formatting completed (parallel)"
+@info "Formatting completed"

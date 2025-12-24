@@ -1,4 +1,4 @@
-@info "Weekly entries selection (parallel)"
+@info "Weekly entries selection"
 
 # Data
 @load "data/exp_pro/approximate_selection.jld2" approximate_selection
@@ -283,4 +283,4 @@ end |> Dict
 # TODO: pour vider la mémoire
 # dfs = nothing
 
-@info "Weekly entries selection completed (parallel)"
+@info "Weekly entries selection completed"

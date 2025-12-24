@@ -1,4 +1,4 @@
-@info "Filtering data (parallel)"
+@info "Filtering data"
 
 # Functions
 function is_valid_df(df::DataFrame)
@@ -20,4 +20,4 @@ end
 filter!(is_valid_df, dfs)
 ThreadsX.foreach(df -> modify_df!(df), dfs)
 
-@info "Filtering completed (parallel)"
+@info "Filtering completed"

@@ -1,6 +1,6 @@
-@info "Splitting data in vector of DataFrames (parallel)"
+@info "Splitting data in vector of DataFrames"
 
 # Processing
 dfs = [DataFrame(g) for g in groupby(dfs, [:_5_years_cat_of_birth, :sex])]
 
-@info "Splitting completed (parallel)"
+@info "Splitting completed"
