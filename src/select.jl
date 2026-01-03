@@ -4,7 +4,8 @@
 @load "data/exp_pro/approximate_selection.jld2" approximate_selection
 
 # Constants
-const APPROXIMATE_SELECTION = approximate_selection
+const APPROXIMATE_SELECTION = approximate_selection::Dict{Int,Int}
+
 const GROUP_ID_VEC = @chain begin
     dfs
     keys
@@ -12,20 +13,22 @@ const GROUP_ID_VEC = @chain begin
 end
 
 # Functions
-# INFO: select_subgroups sélectionne toutes les semaines de la semaine 54 à 
-# la semaine 131, puis tente de sélectionner autant de semaines que possible 
-# depuis la semaine 1. Il teste différent nombres de semaines à partir d'un 
-# nombre de semaines probablement correct (APPROXIMATE_SELECTION): si le test 
-# réussit, il teste une semaine de plus jusqu'à échouer, et retient le dernier 
-# nombre de semaines qui a réussi; si le teste échoue, il teste une semaine de 
-# moins jusqu'à réussir, et retient le premier nombre de semaines qui réussit.
-# create_subgroups déclenche une erreur s'il n'y a pas assez d'individus dans
-# un sous-groupe, ce qui arrive nécessairement lorsqu'il y a trop de
-# sous-groupes.
-function select_subgroups(ENTRIES, APPROXIMATE_SELECTION, group_id; maxk = 53)
+
+# INFO: Attention! Le type des entrées et des sorties de chaque fonction est indiqué lors de leur définition et assez souvent lors de leur appel. Cela permet de renseigner et de vérifier immédiatement les types, mais si des types doivent être changés, l'indication de type doit être changé partout.
+
+# INFO:
+# La fonction `select_subgroups` sélectionne toutes les semaines de la semaine 54 à la semaine 131, puis tente de sélectionner autant de semaines que possible depuis la semaine 1. Il teste différent nombres de semaines à partir d'un nombre de semaines probablement correct (APPROXIMATE_SELECTION): si le test réussit, il teste une semaine de plus jusqu'à échouer, et retient le dernier nombre de semaines qui a réussi; si le teste échoue, il teste une semaine de moins jusqu'à réussir, et retient le premier nombre de semaines qui réussit. create_subgroups déclenche une erreur s'il n'y a pas assez d'individus dans un sous-groupe, ce qui arrive nécessairement lorsqu'il y a trop de sous-groupes.
+function select_subgroups(
+    ENTRIES::Vector{Date},
+    APPROXIMATE_SELECTION::Dict{Int64,Int64},
+    group_id::Int;
+    maxk = 53,
+)::Dict{Date,DataFrame}
+    # INFO: initialisation de la sortie
+    subgroups = Dict{Date,DataFrame}()
+    head = ENTRIES[1:APPROXIMATE_SELECTION[group_id]]
     tail = ENTRIES[54:131]
-    subgroups = nothing
-    these_mondays = vcat(ENTRIES[1:APPROXIMATE_SELECTION[group_id]], tail)
+    these_mondays = vcat(head, tail)
     try
         subgroups = create_subgroups(ENTRIES, group_id, these_mondays, MONDAYS, dfs)
         # @info "group_id = $group_id\nWe are bellow at $(ok)!"
@@ -67,13 +70,14 @@ function create_subgroups(
     these_mondays::Vector{Date},
     MONDAYS::Vector{Date},
     dfs::Dict{Int,DataFrame},
-)
+)::Dict{Date,DataFrame}
     # TEST: créée une vraie copie, pour les tests.
-    group = deepcopy(dfs[group_id])
-    # TODO: pas une vraie copie = moins de mémoire, mais le dfs original 
+    group = deepcopy(dfs[group_id])::DataFrame
+    # pas une vraie copie = moins de mémoire, mais le dfs original 
     # est détruit en cours de route. Mais la consommation mémoire n'est 
     # pas la préoccupation majeure pour ce type de programme.
     # group = dfs[group_id]
+    # INFO: initialisation de la sortie
     subgroups = Dict(
         entry => DataFrame(
             vaccinated = Bool[],
@@ -83,30 +87,45 @@ function create_subgroups(
             DCCI = Vector{Tuple{Int,Date}}[],
         ) for entry in ENTRIES
     )
+    # INFO: when_what_where_dict est un agenda qui indique à quelle date il faudra remplacer un non-vacciné A par un autre B, parce que le non-vacciné A se vaccine. Cet agenda indique également dans quels subroups sont les non-vaccinés à remplacer, et à quelles lignes. L'agenda est mis à jour à chaque ajout de non-vaccinés, c'est-à-dire à chaque itération de la boucle `in MONDAYS`.
     when_what_where_dict = Dict{Date,Dict{Date,Vector{Int}}}()
     for this_monday in MONDAYS
+        # INFO: traitement des vaccinés (qui ne sont jamais remplacés car ils ne se dévaccinent pas) et des premiers non-vaccinés (qui peuvent être remplacés parce qu'ils peuvent se vacciner). Écriture de l'agenda when_what_where_dict pour y ajouter les non-vaccinés qui devront être remplacés, à quelles dates, dans quels sugroups et à quelles lignes.
         if this_monday in these_mondays
             subgroup = subgroups[this_monday]
-            # Pour les vaccinés
-            vaccinated_count = process_vaccinated!(group, subgroup, this_monday)
+            # INFO: pour les vaccinés
+            # Renvoie aussi le nombre de vaccinés dans chaque subgroup, car le nombre de vaccinés et de non-vaccinés doit être égal dans chaque subgroups
+            vaccinated_count = process_vaccinated!(
+                group::DataFrame,
+                subgroup::DataFrame,
+                this_monday::Date,
+            )::Int
             # Pour les premiers non-vaccinés
             process_first_unvaccinated!(
-                group,
-                subgroup,
-                this_monday,
-                vaccinated_count,
-                when_what_where_dict,
-            )
+                group::DataFrame,
+                subgroup::DataFrame,
+                this_monday::Date,
+                vaccinated_count::Int,
+                when_what_where_dict::Dict{Date,Dict{Date,Vector{Int}}},
+            )::Nothing
         end
         # Pour les non-vaccinés de remplacement
-        replace_unvaccinated!(this_monday, group, subgroups, when_what_where_dict)
+        # INFO: replace_unvaccinated!
+        # À chaque `this_monday`, on ouvre l'agenda et on regarde ce qu'il y a à faire: quels non-vaccinés doivent être remplacés parce qu'ils se vaccinent. Les non-vaccinés sont remplacés exactement à leur date de vaccination et non avant, afin d'éviter les paradoxes où un évènement passé (le remplacement) est déterminé par un évènement futur (la vaccination). La fonction `replace_unvaccinated!` écrit aussi dans l'agenda lorsque des non-vaccinés de remplacement se vaccinent avant la fin de la période d'observation, afin de pouvoir les remplacer eux aussi lors d'itérations ultérieures de la boucle `in MONDAYS`.
+        replace_unvaccinated!(
+            this_monday::Date,
+            group::DataFrame,
+            subgroups::Dict{Date,DataFrame},
+            when_what_where_dict::Dict{Date,Dict{Date,Vector{Int}}},
+        )::Nothing
     end
     filter!(kv -> nrow(kv[2]) > 0, subgroups)
-    # return subgroups, when_what_where_dict # TEST: on peut ne pas renvoyer when_what_where_dict
+    # TEST: renvoyer when_what_where_dict avec subgroups
+    # return subgroups, when_what_where_dict
     return subgroups
 end
 
-function process_vaccinated!(group::DataFrame, subgroup::DataFrame, this_monday::Date)
+function process_vaccinated!(group::DataFrame, subgroup::DataFrame, this_monday::Date)::Int
     # INFO: Repérer dans `group` les vaccinés du `subgroup` en cours, puis les mettre dans subgroups[entry], puis les marquer comme non-disponibles dans `group`.
     for row in eachrow(group)
         if row.week_of_dose1 == this_monday
@@ -138,30 +157,29 @@ function process_first_unvaccinated!(
     this_monday::Date,
     vaccinated_count::Int,
     when_what_where_dict::Dict{Date,Dict{Date,Vector{Int}}},
-)
+)::Nothing
     if vaccinated_count != 0
         eligible = findall(
             row ->
             # sont éligibles:
             # les vivants:
-                this_monday <= row.week_of_death &&
+                this_monday <= row.week_of_death && # INFO: peuvent mourir la semaine courante de this_monday.
                 # non-vaccinés:
-                this_monday < row.week_of_dose1 &&
+                this_monday < row.week_of_dose1 && # INFO: doivent être non-vaccinés la semaine courante
                 # qui ne sont pas encore dans un autre subgroup:
-                row.available < this_monday,
-            eachrow(group),
+								row.available <= this_monday, # INFO: était auparavant `<`. Pourtant, plus bas: `group[i, :available] = exit + Week(1)`, ce qui signifie ces non-vaccinés sont disponibles un peu plus tôt, à partir de la semaine 54 et non 55. Mais est-ce que cela pose problème pour la toute première semaine, où la vaccination commence le dimanche 27 décembre 2020? En principe, non, car cela fait un décalage de 6 + 1.24 jours seulement. Il faut peut-être éclaircir le code au sujet des décalages des jours, car une année fait 52 semaines + 1.24 jours, et les vaccinations sont réputées commencer en milieu de semaines ou en fin en ce qui concerne la toute première semaine.
+								eachrow(group),
         )
-        if !isempty(eligible) && length(eligible) < vaccinated_count
+        if length(eligible) < vaccinated_count
             error(
                 "$this_monday: Moins de non-vaccinés que de vaccinés pour entry = $this_monday",
             )
-        end
-        if isempty(eligible)
-            error("$this_monday: Aucun non-vacciné éligible pour entry = $this_monday")
+						# INFO: cette erreur permet à la fonction `select_subgroups` de sélectionner le bon nombre de subgroups.
         end
         # numéros de lignes, qui sont sélectionnées:
+				# INFO: sélectionner, parmi les éligibles, le même nombre de non-vaccinés que de vaccinés.
         selected =
-            sample(eligible, min(vaccinated_count, length(eligible)), replace = false)
+            sample(eligible, vaccinated_count, replace = false)
         for i in selected
             # INFO: Chaque ligne sélectionnée dans group:
             row = group[i, :]
@@ -170,22 +188,22 @@ function process_first_unvaccinated!(
             entry = this_monday
             exit = min(row.week_of_dose1, this_monday + Week(53))
             death = row.week_of_death
-            DCCI = [(row.DCCI, this_monday)] # TEST: remplacement par la valeur de DCCI
+            DCCI = [(row.DCCI, this_monday)] # INFO: l'indice de comorbidités
             push!(
                 subgroup,
                 (
-                    vaccinated = vaccinated,
+                    vaccinated = vaccinated, # vaccinated = false
                     entry = entry,
                     exit = exit,
                     death = death,
                     DCCI = DCCI,
                 ),
             )
-            # INFO: Un non-vaccinés redevient disponible soit lorsqu'il est vaccinés, soit lorsqu'il sort de la subgroup. Attention, il pourrait être "disponible", après sa mort, d'où l'importance de vérifier si les non-vaccinés ne sont pas mort, avant d'intégrer ou de réintégrer une subgroup!
+            # INFO: Un non-vacciné redevient disponible soit lorsqu'il est vacciné, soit lorsqu'il sort du subgroup. Attention, il pourrait être "disponible", après sa mort, d'où l'importance de vérifier si les non-vaccinés ne sont pas mort, avant d'intégrer ou de réintégrer une subgroup!
             group[i, :available] = exit + Week(1)
         end
     end
-    # INFO: Il faut ensuite noter dans `when_what_where_dict` les non-vaccinés qui devront être remplacés, et quand.
+    # INFO: Il faut ensuite noter dans l'agenda `when_what_where_dict` les non-vaccinés qui devront être remplacés, et quand.
     # Itérateur sur les non-vaccinés à remplacer (when, what, where)
     when_what_where_iter = (
         (
@@ -214,6 +232,7 @@ function process_first_unvaccinated!(
             append!(_, _where)
         end
     end
+		return nothing
 end
 
 function replace_unvaccinated!(
@@ -221,7 +240,7 @@ function replace_unvaccinated!(
     group::DataFrame,
     subgroups::Dict{Date,DataFrame},
     when_what_where_dict::Dict{Date,Dict{Date,Vector{Int}}},
-)
+)::Nothing
     # rien à faire si aucun remplacement planifié pour this_monday
     if !haskey(when_what_where_dict, this_monday)
         return nothing
@@ -237,7 +256,7 @@ function replace_unvaccinated!(
             # non-vaccinés:
             _when < row.week_of_dose1 &&
             # qui ne sont pas encore dans un autre subgroup:
-            row.available < _when,
+            row.available <= _when, # INFO: vérifier si c'est bien <= et non <
         eachrow(group),
     )
     for (_what, _where) in inner_dict
@@ -281,12 +300,13 @@ function replace_unvaccinated!(
     return nothing
 end
 
-# Functions
+# Processing
 exact_selection =
     ThreadsX.map(GROUP_ID_VEC) do group_id
         group_id => select_subgroups(ENTRIES, APPROXIMATE_SELECTION, group_id)
     end |> Dict
-# TODO: pour vider la mémoire
+
+# TODO: pour vider la mémoire. Pas nécessaire.
 # dfs = nothing
 
 @info "Weekly entries selection completed"
