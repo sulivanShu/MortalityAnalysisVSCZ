@@ -18,7 +18,7 @@ exact_selection =
 
 Random.seed!(seed)
 subgroups = select_subgroups(ENTRIES, APPROXIMATE_SELECTION, group_id_sample)
-subgroups[this_monday]
+subgroups[this_monday][:, :DCCI]
 
 
 Random.seed!(seed)

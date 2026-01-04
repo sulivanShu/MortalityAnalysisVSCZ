@@ -244,53 +244,54 @@ function replace_unvaccinated!(
     # rien à faire si aucun remplacement planifié pour this_monday
     if !haskey(when_what_where_dict, this_monday)
         return nothing
-    end
-    _when = this_monday
-    inner_dict = when_what_where_dict[_when]
-    # Les éligibles doivent être calculés de la même manière que dans chaque fonction `process_first_unvaccinated!`.
-    eligible = findall(
-        row ->
-        # Sont éligibles, à la date de remplacement:
-        # les vivants:
-            _when <= row.week_of_death &&
-            # non-vaccinés:
-            _when < row.week_of_dose1 &&
-            # qui ne sont pas encore dans un autre subgroup:
-            row.available <= _when, # INFO: vérifier si c'est bien <= et non <
-        eachrow(group),
-    )
-    for (_what, _where) in inner_dict
-        if length(eligible) < length(_where)
-            error(
-                "$this_monday: Impossible replacement in $(_what)! `eligible` is lesser than `length(_where)`!",
-            )
-        else
-            selected = sample(eligible, length(_where), replace = false)
-            for i in selected # INFO: `i` is each element of the `selected` vector.
-                row = group[i, :] # INFO: select all columns of line `i` of `group`
-                exit = min(row.week_of_dose1, _what + Week(53))
-                group[i, :available] = exit + Week(1)
-            end
-            subgroup = subgroups[_what]
-            for (k, i) in enumerate(_where) # INFO: `i` have each `_where` value, and `k` is the range of `i` [1, 2, 3...].
-                s = selected[k] # un individu de remplacement
-                subgroup_end = _what + Week(53)
-                vaccination_date = group[s, :week_of_dose1]
-                exit = min(subgroup_end, vaccination_date)
-                death = group[s, :week_of_death]
-                subgroup.exit[i] = exit
-                subgroup.death[i] = death
-                push!(subgroup.DCCI[i], (group[s, :DCCI], this_monday))
-                if vaccination_date <= subgroup_end # Même chose que dans la fonction `process_first_unvaccinated`
-                    @chain begin
-                        # dans when_what_where_dict (un dictionnaire)
-                        when_what_where_dict
-                        # récupérer la valeur de la clé `vaccination_date` (un dictionnaire)
-                        get!(_, vaccination_date, Dict{Date,Vector{Int}}())
-                        # dans ce dictionnaire, récupérer la valeur de la clé `_what` (un vecteur)
-                        get!(_, _what, Int[])
-                        # dans ce vecteur, ajouter la valeur de `i`.
-                        append!(_, i)
+    else
+        _when = this_monday
+        inner_dict = when_what_where_dict[_when]
+        # Les éligibles doivent être calculés de la même manière que dans chaque fonction `process_first_unvaccinated!`.
+        eligible = findall(
+            row ->
+            # Sont éligibles, à la date de remplacement:
+            # les vivants:
+                _when <= row.week_of_death &&
+                # non-vaccinés:
+                _when < row.week_of_dose1 &&
+                # qui ne sont pas encore dans un autre subgroup:
+                row.available <= _when, # INFO: vérifier si c'est bien <= et non <
+            eachrow(group),
+        )
+        for (_what, _where) in inner_dict
+            if length(eligible) < length(_where)
+                error(
+                    "$this_monday: Impossible replacement in $(_what)! `eligible` is lesser than `length(_where)`!",
+                )
+            else
+                selected = sample(eligible, length(_where), replace = false)
+                for i in selected # INFO: `i` is each element of the `selected` vector.
+                    row = group[i, :] # INFO: select all columns of line `i` of `group`
+                    exit = min(row.week_of_dose1, _what + Week(53))
+                    group[i, :available] = exit + Week(1)
+                end
+                subgroup = subgroups[_what]
+                for (k, i) in enumerate(_where) # INFO: `i` have each `_where` value, and `k` is the range of `i` [1, 2, 3...].
+                    s = selected[k] # l'indice d'un individu de remplacement dans group
+                    subgroup_end = _what + Week(53)
+                    vaccination_date = group[s, :week_of_dose1] # sa date de vaccination (le cas échéant Date(1000,01,01), ce qui représente la non-vaccination)
+                    exit = min(subgroup_end, vaccination_date)
+                    death = group[s, :week_of_death] # sa date de décès
+                    subgroup.exit[i] = exit # mettre la donnée dans subgroup
+                    subgroup.death[i] = death # mettre la donnée dans subgroup. Il n'est pas vraiment nécessaire de mettre à jour s'il ne s'agit pas du dernier non-vaccinés...
+                    push!(subgroup.DCCI[i], (group[s, :DCCI], this_monday))
+                    if vaccination_date <= subgroup_end # Même chose que dans la fonction `process_first_unvaccinated`. `<=` ?
+                        @chain begin
+                            # dans when_what_where_dict (un dictionnaire)
+                            when_what_where_dict
+                            # récupérer la valeur de la clé `vaccination_date` (un dictionnaire)
+                            get!(_, vaccination_date, Dict{Date,Vector{Int}}())
+                            # dans ce dictionnaire, récupérer la valeur de la clé `_what` (un vecteur)
+                            get!(_, _what, Int[])
+                            # dans ce vecteur, ajouter la valeur de `i`.
+                            append!(_, i)
+                        end
                     end
                 end
             end
@@ -305,7 +306,7 @@ exact_selection =
         group_id => select_subgroups(ENTRIES, APPROXIMATE_SELECTION, group_id)
     end |> Dict
 
-# TODO: pour vider la mémoire. Pas nécessaire.
+# INFO: pour vider la mémoire. Pas nécessaire.
 # dfs = nothing
 
 @info "Weekly entries selection completed"
