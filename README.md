@@ -28,3 +28,7 @@ using DrWatson
 @quickactivate "MortalityAnalysisVSCZ"
 ```
 which auto-activate the project and enable local path handling from DrWatson.
+
+# Program entry
+
+scripts/main.jl
