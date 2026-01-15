@@ -5,12 +5,12 @@ function drop_unused_columns!(df::DataFrame)
     select!(
         df,
         Not([
-            :week_of_dose2,
-            :week_of_dose3,
-            :week_of_dose4,
-            :week_of_dose5,
-            :week_of_dose6,
-            :week_of_dose7,
+            :dose2_week,
+            :dose3_week,
+            :dose4_week,
+            :dose5_week,
+            :dose6_week,
+            :dose7_week,
         ]),
     )
 end

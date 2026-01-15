@@ -130,11 +130,11 @@ end
 function process_vaccinated!(pool::DataFrame, subgroup::DataFrame, this_monday::Date)::Int
     # INFO: Repérer dans `pool` les vaccinés du `subgroup` en cours, puis les mettre dans group[entry].
     for row in eachrow(pool)
-        if row.week_of_dose1 == this_monday
+        if row.dose1_week == this_monday
             vaccinated = true
             entry = this_monday
             exit = this_monday + Week(53) # INFO: un peu plus qu'un an, 53 semaines en tout
-            death = row.week_of_death
+            death = row.death_week
 						DCCI = [(row.DCCI, this_monday)] # INFO: un vecteur d'une paire (tuple)
             push!(
                 subgroup,
@@ -164,11 +164,11 @@ function process_first_unvaccinated!(
             row ->
             # sont éligibles:
             # les vivants:
-                this_monday <= row.week_of_death && # INFO: peuvent mourir la semaine courante de this_monday.
+                this_monday <= row.death_week && # INFO: peuvent mourir la semaine courante de this_monday.
                 # non-vaccinés:
-                this_monday < row.week_of_dose1 && # INFO: doivent être non-vaccinés la semaine courante
+                this_monday < row.dose1_week && # INFO: doivent être non-vaccinés la semaine courante
                 # qui ne sont pas encore dans un autre subgroup:
-                row.available <= this_monday, # INFO: était auparavant `<`. Pourtant, plus bas: `pool[i, :available] = exit + Week(1)`, ce qui signifie ces non-vaccinés sont disponibles un peu plus tôt, à partir de la semaine 54 et non 55. Mais est-ce que cela pose problème pour la toute première semaine, où la vaccination commence le dimanche 27 décembre 2020? En principe, non, car cela fait un décalage de 6 + 1.24 jours seulement. Il faut peut-être éclaircir le code au sujet des décalages des jours, car une année fait 52 semaines + 1.24 jours, et les vaccinations sont réputées commencer en milieu de semaines ou en fin en ce qui concerne la toute première semaine.
+                row.availability_week <= this_monday, # INFO: était auparavant `<`. Pourtant, plus bas: `pool[i, :availability_week] = exit + Week(1)`, ce qui signifie ces non-vaccinés sont disponibles un peu plus tôt, à partir de la semaine 54 et non 55. Mais est-ce que cela pose problème pour la toute première semaine, où la vaccination commence le dimanche 27 décembre 2020? En principe, non, car cela fait un décalage de 6 + 1.24 jours seulement. Il faut peut-être éclaircir le code au sujet des décalages des jours, car une année fait 52 semaines + 1.24 jours, et les vaccinations sont réputées commencer en milieu de semaines ou en fin en ce qui concerne la toute première semaine.
             eachrow(pool),
         )
         if length(eligible) < vaccinated_count
@@ -186,8 +186,8 @@ function process_first_unvaccinated!(
                 # INFO: un non-vaccinés sort soit à la fin de la subgroup, soit au moment de sa vaccination.
                 vaccinated = false
                 entry = this_monday
-                exit = min(row.week_of_dose1, this_monday + Week(53))
-                death = row.week_of_death
+                exit = min(row.dose1_week, this_monday + Week(53))
+                death = row.death_week
                 DCCI = [(row.DCCI, this_monday)] # INFO: l'indice de comorbidités
                 push!(
                     subgroup,
@@ -200,7 +200,7 @@ function process_first_unvaccinated!(
                     ),
                 )
                 # INFO: Un non-vacciné redevient disponible soit lorsqu'il est vacciné, soit lorsqu'il sort du subgroup. Attention, il pourrait être "disponible", après sa mort, d'où l'importance de vérifier si les non-vaccinés ne sont pas mort, avant d'intégrer ou de réintégrer une subgroup!
-                pool[i, :available] = exit + Week(1)
+                pool[i, :availability_week] = exit + Week(1)
             end
         end
     end
@@ -254,11 +254,11 @@ function replace_unvaccinated!(
             row ->
             # Sont éligibles, à la date de remplacement:
             # les vivants:
-                _when <= row.week_of_death &&
+                _when <= row.death_week &&
                 # non-vaccinés:
-                _when < row.week_of_dose1 &&
+                _when < row.dose1_week &&
                 # qui ne sont pas encore dans un autre subgroup:
-                row.available <= _when, # INFO: vérifier si c'est bien <= et non <
+                row.availability_week <= _when, # INFO: vérifier si c'est bien <= et non <
             eachrow(pool),
         )
         for (_what, _where) in inner_dict
@@ -270,16 +270,16 @@ function replace_unvaccinated!(
                 selected = sample(eligible, length(_where), replace = false)
                 for i in selected # INFO: `i` is each element of the `selected` vector.
                     row = pool[i, :] # INFO: select all columns of line `i` of `pool`
-                    exit = min(row.week_of_dose1, _what + Week(53))
-                    pool[i, :available] = exit + Week(1)
+                    exit = min(row.dose1_week, _what + Week(53))
+                    pool[i, :availability_week] = exit + Week(1)
                 end
                 subgroup = group[_what]
                 for (k, i) in enumerate(_where) # INFO: `i` have each `_where` value, and `k` is the range of `i` [1, 2, 3...].
                     s = selected[k] # l'indice d'un individu de remplacement dans pool
                     subgroup_end = _what + Week(53)
-                    vaccination_date = pool[s, :week_of_dose1] # sa date de vaccination (le cas échéant Date(1000,01,01), ce qui représente la non-vaccination)
+                    vaccination_date = pool[s, :dose1_week] # sa date de vaccination (le cas échéant Date(1000,01,01), ce qui représente la non-vaccination)
                     exit = min(subgroup_end, vaccination_date)
-                    death = pool[s, :week_of_death] # sa date de décès
+                    death = pool[s, :death_week] # sa date de décès
                     subgroup.exit[i] = exit # mettre la donnée dans subgroup
                     subgroup.death[i] = death # mettre la donnée dans subgroup. Il n'est pas vraiment nécessaire de mettre à jour s'il ne s'agit pas du dernier non-vaccinés...
                     push!(subgroup.DCCI[i], (pool[s, :DCCI], this_monday))

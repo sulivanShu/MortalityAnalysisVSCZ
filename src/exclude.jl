@@ -13,7 +13,7 @@ function modify_df!(df::DataFrame)
     filter!(
         row ->
             (ismissing(row.infection_rank) || row.infection_rank == 1) &&
-            (ismissing(row.week_of_death) || row.week_of_death > cutoff), # Décédé strictement avant la semaine de vaccination.
+            (ismissing(row.death_week) || row.death_week > cutoff), # Décédé strictement avant la semaine de vaccination.
         df,
     )
     select!(df, Not(:infection_rank))

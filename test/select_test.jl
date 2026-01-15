@@ -1,27 +1,27 @@
 # TEST:
 # Pour un seul petit groupe, car faire les 40 groupes dure environ 10 min avec un processeur 8 threads.
-# pour des sorties déterministes, ne pas oublier de mettre Random.seed!(seed) avant chaque exécution concernant les non-vaccinés, car il y a un tirage.
-seed = 0
+# pour des sorties déterministes, ne pas oublier de mettre Random.seed!(my_seed) avant chaque exécution concernant les non-vaccinés, car il y a un tirage.
 group_id_sample = 11920
 this_monday = Date(2020, 12, 21)
 # head = ENTRIES[1:7] 
 head = ENTRIES[1:APPROXIMATE_SELECTION[group_id_sample]]
 tail = ENTRIES[54:131]
 these_mondays = vcat(head, tail)
-group = deepcopy(dfs[group_id_sample])::DataFrame
+pool = deepcopy(dfs[group_id_sample])::DataFrame
 
-Random.seed!(seed)
+Random.seed!(my_seed)
 exact_selection =
     ThreadsX.map([group_id_sample]) do group_id
         group_id => select_subgroups(ENTRIES, APPROXIMATE_SELECTION, group_id)
     end |> Dict
 
-Random.seed!(seed)
+Random.seed!(my_seed)
 subgroups = select_subgroups(ENTRIES, APPROXIMATE_SELECTION, group_id_sample)
 subgroups[this_monday][:, :DCCI]
 
+dfs[11920]
 
-Random.seed!(seed)
+Random.seed!(my_seed)
 head = ENTRIES[1:7] 
 these_mondays = vcat(head, tail)
 subgroups = create_subgroups(
@@ -34,7 +34,7 @@ subgroups = create_subgroups(
 subgroups[this_monday]
 
 # Attention, `process_vaccinated!` est impure! elle modifie sa propre entrée: subgroup. D'où la nécessité de réinitialiser subgroups et subgroup.
-Random.seed!(seed)
+Random.seed!(my_seed)
 subgroups = Dict(
     entry => DataFrame(
         vaccinated = Bool[],
@@ -49,7 +49,7 @@ vaccinated_count = process_vaccinated!(group::DataFrame, subgroup::DataFrame, th
 subgroup
 
 # Attention, `process_first_unvaccinated!` est impure! D'où la nécessité de réinitialiser group, subgroups, subgroup et when_what_where_dict.
-Random.seed!(seed)
+Random.seed!(my_seed)
 group = deepcopy(dfs[group_id_sample])::DataFrame
 subgroups = Dict(
     entry => DataFrame(
@@ -91,7 +91,7 @@ eligible = findall(
 nrow(group)
 length(eligible)
 
-Random.seed!(seed)
+Random.seed!(my_seed)
 selected = sample(eligible, vaccinated_count, replace = false)
 
 when_what_where_iter = (
@@ -110,3 +110,5 @@ enumerate(eachrow(subgroup))
 collect(when_what_where_iter)
 
 Date(2021,12,27)-Date(2020,12,21) == Week(53)
+
+dfs[11920]

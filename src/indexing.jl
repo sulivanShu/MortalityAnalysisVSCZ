@@ -11,9 +11,9 @@ dfs = Dict(
 
 ThreadsX.foreach(
     df -> begin
-        select!(df.second, [:week_of_dose1, :week_of_death, :DCCI])
+        select!(df.second, [:dose1_week, :death_week, :DCCI])
         foreach(col -> replace!(col, missing => Date(10000, 1, 1)), eachcol(df.second))
-        insertcols!(df.second, 1, :available => Date(-10000, 1, 1))
+        insertcols!(df.second, 1, :availability_week => Date(-10000, 1, 1))
     end,
     dfs,
 )

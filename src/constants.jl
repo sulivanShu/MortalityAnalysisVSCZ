@@ -11,7 +11,7 @@ const FIRST_MONDAY = Date(2020, 12, 21)
 const LAST_MONDAY = Date(2024, 06, 24)
 const MONDAYS = collect(FIRST_MONDAY:Week(1):LAST_MONDAY)
 const ENTRIES = first(MONDAYS, length(MONDAYS)-53)
-const YEAR_WEEK = ["week_of_dose1", "week_of_death"]
+const YEAR_WEEK = ["dose1_week", "death_week"]
 const YEAR_YEAR = ["_5_years_cat_of_birth"]
 
 @info "Constantes loaded"

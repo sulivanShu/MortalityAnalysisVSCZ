@@ -12,5 +12,4 @@ To (locally) reproduce this project, do the following:
 0. Clone this depot.
 1. Open a Julia console and run scripts/main.jl .
 
-This will install all necessary packages and data for you to be able to run the scripts and
-everything should work out of the box, including correctly finding local paths.
+This will install all necessary packages and data for you to be able to run the scripts.
