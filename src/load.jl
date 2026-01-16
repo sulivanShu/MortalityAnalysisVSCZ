@@ -7,12 +7,6 @@ const MY_CZECH_HEADER = [
     "Pohlavi",
     "RokNarozeni",
     "Datum_Prvni_davka",
-    "Datum_Druha_davka",
-    "Datum_Treti_davka",
-    "Datum_Ctvrta_davka",
-    "Datum_Pata_davka",
-    "Datum_Sesta_davka",
-    "Datum_Sedma_davka",
     "DatumUmrtiLPZ",
     "DCCI",
 ]
