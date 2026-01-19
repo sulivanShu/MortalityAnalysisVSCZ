@@ -4,18 +4,18 @@
 @load "data/exp_pro/approximate_first_intervals_stops.jld2" approximate_selection
 
 # Constantes
-const APPROXIMATE_FIRST_STOPS = approximate_selection::Dict{Int,Int}
-const DFS = dfs::Dict{Int, DataFrame}
-const MAX_FIRST_STOP = 53
+global const APPROXIMATE_FIRST_STOPS = approximate_selection::Dict{Int,Int}
+global const DFS = dfs::Dict{Int, DataFrame}
+global const MAX_FIRST_STOP = 53
 # const GROUP_ID_VEC = @chain DFS keys collect # sort # Int[] # INFO: Production
 # GROUP_ID_VEC = @chain DFS keys collect # sort # Int[] # TEST: Production
 # GROUP_ID_VEC = 12005 # first(GROUP_ID_VEC)::Int # TEST: pour les tests
-GROUP_ID_VEC = 11920 # first(GROUP_ID_VEC)::Int # TEST: pour les tests
-const TAIL = ENTRIES[54:131]::Vector{Date}
+global GROUP_ID_VEC = 11920 # first(GROUP_ID_VEC)::Int # TEST: pour les tests # this is not used anymore ?
+global const TAIL = ENTRIES[54:131]::Vector{Date}
 
 # Functions
 ## Low level functions
-function init_group(ENTRIES = ENTRIES)::Dict{Date,DataFrame}
+function init_group()::Dict{Date,DataFrame}
 	group = Dict(
 							 entry => DataFrame(
 																	vaccinated = Bool[],
@@ -33,47 +33,37 @@ end
 
 function all_weeks_are_selected(
 		group_id::Int ;
-		APPROXIMATE_FIRST_STOPS = APPROXIMATE_FIRST_STOPS,
-		MAX_FIRST_STOP = MAX_FIRST_STOP,
 		)::Bool
 	APPROXIMATE_FIRST_STOPS[group_id] == MAX_FIRST_STOP
 end
 
 function get_these_mondays(
-		group_id::Int ;
-		ENTRIES = ENTRIES,
-		APPROXIMATE_FIRST_STOPS = APPROXIMATE_FIRST_STOPS,
-		TAIL = TAIL,
+		group_id::Int
 		)::Vector{Date}
 	head = ENTRIES[1:APPROXIMATE_FIRST_STOPS[group_id]]
 	these_mondays = vcat(head, TAIL)
 end
 
 function try_these_mondays(
-		next_or_previous::Int;
-		ENTRIES = ENTRIES,
-		TAIL = TAIL,
+		next_or_previous::Int
 	)::Vector{Date}
 	these_mondays = vcat(ENTRIES[1:next], TAIL)
 end
 
 function get_next_first_interval_iterator(
-		group_id::Int ;
-		APPROXIMATE_FIRST_STOPS = APPROXIMATE_FIRST_STOPS,
+		group_id::Int
 	)::UnitRange{Int}
 	(APPROXIMATE_FIRST_STOPS[group_id] + 1):MAX_FIRST_STOP
 end
 
 function get_previous_first_interval_iterator(
-		group_id::Int ;
-		APPROXIMATE_FIRST_STOPS = APPROXIMATE_FIRST_STOPS,
+		group_id::Int
 	)::StepRange{Int,Int}
 	(APPROXIMATE_FIRST_STOPS[group_id] - 1):-1:0
 end
 
 function get_pool_from(
-		group_id::Int;
-		DFS = DFS,
+		group_id::Int
 		)::DataFrame
 	deepcopy(DFS[group_id])
 end
@@ -105,12 +95,6 @@ end
 ## High level functions
 function select_subgroups(
 		group_id::Int ;
-		ENTRIES = ENTRIES,
-		APPROXIMATE_FIRST_STOPS = APPROXIMATE_FIRST_STOPS,
-		MAX_FIRST_STOP = MAX_FIRST_STOP,
-		TAIL = TAIL,
-		ALL_MONDAYS = ALL_MONDAYS,
-		DFS = DFS,
 		group = init_group(),
 		)::Dict{Date,DataFrame}
 	these_mondays = get_these_mondays(group_id)
@@ -146,9 +130,6 @@ end
 function create_subgroups(
 		group_id::Int,
 		these_mondays::Vector{Date};
-		ALL_MONDAYS = ALL_MONDAYS,
-		ENTRIES = ENTRIES,
-		DFS = DFS,
 		group = init_group(),
 		agenda = init_agenda(),
 	)::Dict{Date,DataFrame}
