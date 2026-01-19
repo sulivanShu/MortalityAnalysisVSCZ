@@ -7,92 +7,12 @@
 const APPROXIMATE_FIRST_STOPS = approximate_selection::Dict{Int,Int}
 const DFS = dfs::Dict{Int, DataFrame}
 const MAX_FIRST_STOP = 53
-# global GROUP_ID_VEC = @chain DFS keys collect # sort # Int[] # INFO: Production
-# global GROUP_ID_VEC = 12005 # first(GROUP_ID_VEC)::Int # TEST: pour les tests
-global GROUP_ID_VEC = 11920 # first(GROUP_ID_VEC)::Int # TEST: pour les tests
 const TAIL = ENTRIES[54:131]::Vector{Date}
+# global GROUP_ID_VEC = @chain DFS keys collect # sort # Int[] # INFO: Production
+global GROUP_ID_VEC = 11920 # first(GROUP_ID_VEC)::Int # TEST: pour les tests
 
 # Functions
-## Low level functions
-function init_group()::Dict{Date,DataFrame}
-	group = Dict(
-							 entry => DataFrame(
-																	vaccinated = Bool[],
-																	entry = Date[],
-																	exit = Date[],
-																	death = Date[],
-																	DCCI = Vector{Tuple{Int,Date}}[],
-																	) for entry in ENTRIES
-							 )
-end
-
-function init_agenda()::Dict{Date,Dict{Date,Vector{Int}}}
-	agenda = Dict{Date,Dict{Date,Vector{Int}}}()
-	# INFO:
-	# la première date représente chaque page de l'agenda,
-	# la deuxième date, l'identifiant de chaque subgroup sur lequel agir,
-	# le vecteur de Int, les lignes de chaque subgroup sur lesquels agir.
-end
-
-function all_weeks_are_selected(
-		group_id::Int
-		)::Bool
-	APPROXIMATE_FIRST_STOPS[group_id] == MAX_FIRST_STOP
-end
-
-function get_these_mondays(
-		group_id::Int
-		)::Vector{Date}
-	head = ENTRIES[1:APPROXIMATE_FIRST_STOPS[group_id]]
-	these_mondays = vcat(head, TAIL)
-end
-
-function try_these_mondays(
-		next_or_previous::Int
-	)::Vector{Date}
-	these_mondays = vcat(ENTRIES[1:next], TAIL)
-end
-
-function get_next_first_interval_iterator(
-		group_id::Int
-	)::UnitRange{Int}
-	(APPROXIMATE_FIRST_STOPS[group_id] + 1):MAX_FIRST_STOP
-end
-
-function get_previous_first_interval_iterator(
-		group_id::Int
-	)::StepRange{Int,Int}
-	(APPROXIMATE_FIRST_STOPS[group_id] - 1):-1:0
-end
-
-function get_pool_from(
-		group_id::Int
-		)::DataFrame
-	deepcopy(DFS[group_id]) # INFO: deepcopy pour ne pas détruire dfs en cours de route, et pouvoir lancer le module plusieurs fois sans avoir à recréer dfs. de toute façon on utilise la constante DFS.
-end
-
-function rm_empty_df_in(group::Dict{Date,DataFrame})::Dict{Date,DataFrame}
-	filter!(kv -> nrow(kv[2]) > 0, group)
-end
-
-function get_eligible(
-		pool::DataFrame,
-		this_monday::Date,
-		)::Vector{Int}
-	findall( 
-					row ->
-					# sont éligibles:
-					## les vivants:
-					this_monday <= row.death_week && # INFO: peuvent mourir la semaine courante de this_monday.
-					## non-vaccinés:
-					this_monday < row.dose1_week && # INFO: doivent être non-vaccinés la semaine courante
-					## qui ne sont pas encore dans un autre subgroup:
-					row.availability_week <= this_monday, # INFO: était auparavant `<`. Pourtant, plus bas: `pool[i, :availability_week] = exit + Week(1)`, ce qui signifie ces non-vaccinés sont disponibles un peu plus tôt, à partir de la semaine 54 et non 55. Mais est-ce que cela pose problème pour la toute première semaine, où la vaccination commence le dimanche 27 décembre 2020? En principe, non, car cela fait un décalage de 6 + 1.24 jours seulement. Il faut peut-être éclaircir le code au sujet des décalages des jours, car une année fait 52 semaines + 1.24 jours, et les vaccinations sont réputées commencer en milieu de semaines ou en fin en ce qui concerne la toute première semaine.
-					eachrow(pool),
-					)
-end
-
-## High level functions
+## High level functions, sorted in hierarchical order
 function select_subgroups(
 		group_id::Int;
 		group = init_group(),
@@ -216,14 +136,14 @@ function process_first_unvaccinated!(
 							),
 						 )
 				# INFO: Un non-vacciné redevient disponible soit lorsqu'il est vacciné, soit lorsqu'il sort du subgroup. Attention, il pourrait être "disponible", après sa mort, d'où l'importance de vérifier si les non-vaccinés ne sont pas mort, avant d'intégrer ou de réintégrer une subgroup!
-				pool[i, :availability_week] = exit + Week(1)
+				pool[i, :availability_week] = exit + Week(1) # une semaine après l'exit. Vérifier.
 			end
 		end
 	end
 	# INFO: Il faut ensuite noter dans l'agenda `agenda` les non-vaccinés qui devront être remplacés, et quand.
 	# Itérateur sur les non-vaccinés à remplacer (when, what, where)
 	# INFO: cet itérateur sélectionne le numéro de ligne, `this_monday` et `exit` de chaque non-vacciné à remplacer dans subroup, mais les réarange dans un autre sens: d'abord la date `exit` (car c'est à ce moment-là qu'il faudra le remplacer), puis `this_monday` (car c'est aussi l'identifiant du subgroup dans lequel le remplacement devra être fait) et le numéro de ligne (car c'est la ligne du non-vacciné à remplacer).
-	when_what_where_iter = (
+	when_what_where_iter = ( # TODO: Changer le nom pour filer la métaphore de l'agenda. Faire construire l'itérateur par une fonction.
 													(
 													 row.exit, # Semaine de vaccination du non-vacciné: quand il faut s'occuper du remplacement
 													 this_monday, # Identifiant (une date) du subgroup: dans quel subgroup a lieu le remplacement
@@ -237,12 +157,12 @@ function process_first_unvaccinated!(
 	# _when: (première date) quand faire le remplacement: au moment de la vaccination d'un non-vacciné,
 	# _what: (deuxième date) dans quel subgroup faire le remplacement,
 	# _where: (Vector{Int}) dans le subgroup, quels sont les numéros de ligne des non-vaccinés à remplacer.
-	for (_when, _what, _where) in when_what_where_iter
+	for (_when, _what, _where) in when_what_where_iter # TODO: changer les noms pour filer la métaphore de l'agenda.
 		# INFO: Dans `agenda`: récupère (ou crée si absent) le dictionnaire interne associé à la date de vaccination du non-vacciné (_when).
-		@chain begin
+		@chain begin # TODO: à mettre dans une fonction pour être réutilisée plus tard.
 			# INFO: Chercher dans le dictionnaire `agenda` la clé `_when`. Si elle existe, retourner la valeur associée (un objet de type `Dict{Date, Vector{Int}}`); si elle n'existe pas, créer une paire `_when => valeur` dont la valeur est un objet vide de type `Dict{Date, Vector{Int}}`, puis retourner cet objet vide. Dans les deux cas, appelons cet objet `inner_dict`.
 			agenda
-			get!(_, _when, Dict{Date,Vector{Int}}())
+			get!(_, _when, Dict{Date,Vector{Int}}()) # TODO: renommer l'objet vide pour être plus explicite
 			# INFO: Chercher dans le dictionnaire `inner_dict` la clé `_what`. Si elle existe, retourner la valeur associée (un objet de type Vector{Int}); si elle n'existe pas, créer une paire `clé => valeur` dont la valeur est un objet vide de type `Vector{Int}`, puis retourner cet objet vide. Dans les deux cas, appelons cet objet `inner_vector` (les lignes à changer, c'est-à-dire les non-vaccinés à remplacer, dans les `group`).
 			get!(_, _what, Int[])
 			# ajouter au vecteur `inner_vector` la valeur `_where`.
@@ -287,7 +207,7 @@ function replace_unvaccinated!(
 					subgroup.death[i] = death # mettre la donnée dans subgroup. Il n'est pas vraiment nécessaire de mettre à jour s'il ne s'agit pas du dernier non-vaccinés...
 					push!(subgroup.DCCI[i], (pool[s, :DCCI], this_monday))
 					if vaccination_date <= subgroup_end # Même chose que dans la fonction `process_first_unvaccinated`. `<=` ?
-						@chain begin
+						@chain begin # TODO: remplacer par une fonction.
 							# dans agenda (un dictionnaire)
 							agenda
 							# récupérer la valeur de la clé `vaccination_date` (un dictionnaire)
@@ -305,9 +225,94 @@ function replace_unvaccinated!(
 	return nothing
 end
 
+## Low level functions sorted in alphabetical order
+function all_weeks_are_selected(
+		group_id::Int
+		)::Bool
+	APPROXIMATE_FIRST_STOPS[group_id] == MAX_FIRST_STOP
+end
+
+function get_eligible(
+		pool::DataFrame,
+		this_monday::Date,
+		)::Vector{Int}
+	findall( 
+					row ->
+					# sont éligibles:
+					## les vivants:
+					this_monday <= row.death_week && # INFO: peuvent mourir la semaine courante de this_monday.
+					## non-vaccinés:
+					this_monday < row.dose1_week && # INFO: doivent être non-vaccinés la semaine courante
+					## qui ne sont pas encore dans un autre subgroup:
+					row.availability_week <= this_monday, # INFO: était auparavant `<`. Pourtant, plus bas: `pool[i, :availability_week] = exit + Week(1)`, ce qui signifie ces non-vaccinés sont disponibles un peu plus tôt, à partir de la semaine 54 et non 55. Mais est-ce que cela pose problème pour la toute première semaine, où la vaccination commence le dimanche 27 décembre 2020? En principe, non, car cela fait un décalage de 6 + 1.24 jours seulement. Il faut peut-être éclaircir le code au sujet des décalages des jours, car une année fait 52 semaines + 1.24 jours, et les vaccinations sont réputées commencer en milieu de semaines ou en fin en ce qui concerne la toute première semaine.
+					eachrow(pool),
+					)
+end
+
+function get_next_first_interval_iterator(
+		group_id::Int
+	)::UnitRange{Int}
+	(APPROXIMATE_FIRST_STOPS[group_id] + 1):MAX_FIRST_STOP
+end
+
+function get_pool_from(
+		group_id::Int
+		)::DataFrame
+	deepcopy(DFS[group_id]) # INFO: deepcopy pour ne pas détruire dfs en cours de route, et pouvoir lancer le module plusieurs fois sans avoir à recréer dfs. de toute façon on utilise la constante DFS.
+end
+
+function get_previous_first_interval_iterator(
+		group_id::Int
+	)::StepRange{Int,Int}
+	(APPROXIMATE_FIRST_STOPS[group_id] - 1):-1:0
+end
+
+function get_these_mondays(
+		group_id::Int
+		)::Vector{Date}
+	head = ENTRIES[1:APPROXIMATE_FIRST_STOPS[group_id]]
+	these_mondays = vcat(head, TAIL)
+end
+
+function get_these_mondays(
+		group_id::Int
+		)::Vector{Date}
+	head = ENTRIES[1:APPROXIMATE_FIRST_STOPS[group_id]]
+	these_mondays = vcat(head, TAIL)
+end
+
+function init_agenda()::Dict{Date,Dict{Date,Vector{Int}}}
+	agenda = Dict{Date,Dict{Date,Vector{Int}}}()
+	# INFO:
+	# la première date représente chaque page de l'agenda,
+	# la deuxième date, l'identifiant de chaque subgroup sur lequel agir,
+	# le vecteur de Int, les lignes de chaque subgroup sur lesquels agir.
+end
+
+function init_group()::Dict{Date,DataFrame}
+	group = Dict(
+							 entry => DataFrame(
+																	vaccinated = Bool[],
+																	entry = Date[],
+																	exit = Date[],
+																	death = Date[],
+																	DCCI = Vector{Tuple{Int,Date}}[],
+																	) for entry in ENTRIES
+							 )
+end
+
+function rm_empty_df_in(group::Dict{Date,DataFrame})::Dict{Date,DataFrame}
+	filter!(kv -> nrow(kv[2]) > 0, group)
+end
+
+function try_these_mondays(
+		next_or_previous::Int
+	)::Vector{Date}
+	these_mondays = vcat(ENTRIES[1:next], TAIL)
+end
+
 # Processing
 exact_selection =
-# ThreadsX.map(GROUP_ID_VEC) do group_id # PRODUCTION
 @time ThreadsX.map(GROUP_ID_VEC) do group_id
 	group_id => select_subgroups(group_id)
 end |> Dict
