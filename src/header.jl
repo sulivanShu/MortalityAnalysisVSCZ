@@ -7,12 +7,6 @@ const MY_ENGLISH_HEADER = [
     "sex",
     "_5_years_cat_of_birth",
     "dose1_week",
-    "dose2_week",
-    "dose3_week",
-    "dose4_week",
-    "dose5_week",
-    "dose6_week",
-    "dose7_week",
     "death_week",
     "DCCI",
 ]
