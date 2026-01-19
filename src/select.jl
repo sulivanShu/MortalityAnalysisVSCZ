@@ -75,6 +75,23 @@ function rm_empty_df_in(group::Dict{Date,DataFrame})::Dict{Date,DataFrame}
 	filter!(kv -> nrow(kv[2]) > 0, group)
 end
 
+function get_eligible(
+		pool::DataFrame,
+		this_monday::Date,
+		)::Vector{Int}
+	findall( 
+					row ->
+					# sont éligibles:
+					## les vivants:
+					this_monday <= row.death_week && # INFO: peuvent mourir la semaine courante de this_monday.
+					## non-vaccinés:
+					this_monday < row.dose1_week && # INFO: doivent être non-vaccinés la semaine courante
+					## qui ne sont pas encore dans un autre subgroup:
+					row.availability_week <= this_monday, # INFO: était auparavant `<`. Pourtant, plus bas: `pool[i, :availability_week] = exit + Week(1)`, ce qui signifie ces non-vaccinés sont disponibles un peu plus tôt, à partir de la semaine 54 et non 55. Mais est-ce que cela pose problème pour la toute première semaine, où la vaccination commence le dimanche 27 décembre 2020? En principe, non, car cela fait un décalage de 6 + 1.24 jours seulement. Il faut peut-être éclaircir le code au sujet des décalages des jours, car une année fait 52 semaines + 1.24 jours, et les vaccinations sont réputées commencer en milieu de semaines ou en fin en ce qui concerne la toute première semaine.
+					eachrow(pool),
+					)
+end
+
 ## High level functions
 function select_subgroups(
 		group_id::Int;
@@ -176,22 +193,9 @@ function process_first_unvaccinated!(
 		agenda::Dict{Date,Dict{Date,Vector{Int}}},
 	)::Nothing
 	if vaccinated_count != 0
-		eligible = findall( # TODO: utiliser une fonction get_eligible()`.
-											 row ->
-											 # sont éligibles:
-											 # les vivants:
-											 this_monday <= row.death_week && # INFO: peuvent mourir la semaine courante de this_monday.
-											 # non-vaccinés:
-											 this_monday < row.dose1_week && # INFO: doivent être non-vaccinés la semaine courante
-											 # qui ne sont pas encore dans un autre subgroup:
-											 row.availability_week <= this_monday, # INFO: était auparavant `<`. Pourtant, plus bas: `pool[i, :availability_week] = exit + Week(1)`, ce qui signifie ces non-vaccinés sont disponibles un peu plus tôt, à partir de la semaine 54 et non 55. Mais est-ce que cela pose problème pour la toute première semaine, où la vaccination commence le dimanche 27 décembre 2020? En principe, non, car cela fait un décalage de 6 + 1.24 jours seulement. Il faut peut-être éclaircir le code au sujet des décalages des jours, car une année fait 52 semaines + 1.24 jours, et les vaccinations sont réputées commencer en milieu de semaines ou en fin en ce qui concerne la toute première semaine.
-											 eachrow(pool),
-											)
+		eligible = get_eligible(pool, this_monday)
 		if length(eligible) < vaccinated_count
-			error(
-						"$this_monday: Moins de non-vaccinés que de vaccinés pour entry = $this_monday",
-					 )
-			# INFO: cette erreur permet à la fonction `select_subgroups` de sélectionner le bon nombre de group.
+			error("$this_monday: fewer unvaccinated than vaccinated individuals. The select_subgroups function will reduce the number of weeks considered in this group.")
 		else
 			# numéros de lignes, qui sont sélectionnées:
 			# INFO: sélectionner, parmi les éligibles, le même nombre de non-vaccinés que de vaccinés.
@@ -255,25 +259,12 @@ function replace_unvaccinated!(
 		group::Dict{Date,DataFrame},
 		agenda::Dict{Date,Dict{Date,Vector{Int}}},
 	)::Nothing
-	# rien à faire si aucun remplacement planifié pour this_monday
+	# Return nothing if nothing to do in agenda for this_monday
 	if !haskey(agenda, this_monday)
 		return nothing
 	else
-		_when = this_monday
-		inner_dict = agenda[_when]
-		# Les éligibles doivent être calculés de la même manière que dans chaque fonction `process_first_unvaccinated!`.
-		eligible = findall(
-											 row ->
-											 # Sont éligibles, à la date de remplacement:
-											 # les vivants:
-											 _when <= row.death_week &&
-											 # non-vaccinés:
-											 _when < row.dose1_week &&
-											 # qui ne sont pas encore dans un autre subgroup:
-											 row.availability_week <= _when, # INFO: vérifier si c'est bien <= et non <
-											 eachrow(pool),
-											)
-		for (_what, _where) in inner_dict
+		eligible = get_eligible(pool, this_monday)
+		for (_what, _where) in agenda[this_monday]
 			if length(eligible) < length(_where)
 				error(
 							"$this_monday: Impossible replacement in $(_what)! `eligible` is lesser than `length(_where)`!",
@@ -315,8 +306,6 @@ function replace_unvaccinated!(
 end
 
 # Processing
-# Variables réinitialisation
-# group = Dict(entry => DataFrame( vaccinated = Bool[], entry = Date[], exit = Date[], death = Date[], DCCI = Vector{Tuple{Int,Date}}[],) for entry in ENTRIES); agenda = Dict{Date,Dict{Date,Vector{Int}}}() # TEST:
 exact_selection =
 # ThreadsX.map(GROUP_ID_VEC) do group_id # PRODUCTION
 @time ThreadsX.map(GROUP_ID_VEC) do group_id
@@ -325,8 +314,6 @@ end |> Dict
 exact_selection[11920][Date("2020-12-21")][:,:DCCI] # TEST:
 # exact_selection[11920][Date("2020-12-21")] # TEST:
 # exact_selection[22005][Date("2022-01-17")] # TEST:
-
-# exact_selection = nothing
 
 # # INFO: pour vider la mémoire. Pas nécessaire.
 # # dfs = nothing
