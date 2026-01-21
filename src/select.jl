@@ -8,8 +8,8 @@ const APPROXIMATE_FIRST_STOPS = approximate_selection::Dict{Int,Int}
 const DFS = dfs::Dict{Int, DataFrame}
 const MAX_FIRST_STOP = 53
 const TAIL = ENTRIES[54:131]::Vector{Date}
-# global GROUP_ID_VEC = @chain DFS keys collect # sort # Int[] # INFO: Production
-global GROUP_ID_VEC = 11920 # first(GROUP_ID_VEC)::Int # TEST: pour les tests
+global GROUP_ID_VEC = @chain DFS keys collect # sort # Int[] # INFO: Production
+# global GROUP_ID_VEC = 11920 # first(GROUP_ID_VEC)::Int # TEST:
 
 # Functions
 ## High level functions, sorted in hierarchical order
@@ -143,7 +143,7 @@ function process_first_unvaccinated!(
 	# INFO: Il faut ensuite noter dans l'agenda `agenda` les non-vaccinés qui devront être remplacés, et quand.
 	# Itérateur sur les non-vaccinés à remplacer (when, what, where)
 	# INFO: cet itérateur sélectionne le numéro de ligne, `this_monday` et `exit` de chaque non-vacciné à remplacer dans subroup, mais les réarange dans un autre sens: d'abord la date `exit` (car c'est à ce moment-là qu'il faudra le remplacer), puis `this_monday` (car c'est aussi l'identifiant du subgroup dans lequel le remplacement devra être fait) et le numéro de ligne (car c'est la ligne du non-vacciné à remplacer).
-	when_what_where_iter = ( # TODO: Changer le nom pour filer la métaphore de l'agenda. Faire construire l'itérateur par une fonction.
+	when_what_where_iter = ( # TODO: Changer le nom pour filer la métaphore de l'agenda. step_by_step ? Faire construire l'itérateur par une fonction.
 													(
 													 row.exit, # Semaine de vaccination du non-vacciné: quand il faut s'occuper du remplacement
 													 this_monday, # Identifiant (une date) du subgroup: dans quel subgroup a lieu le remplacement
@@ -152,23 +152,8 @@ function process_first_unvaccinated!(
 													# INFO: On ne retient que les individus dont la durée (exit - entry) est strictement inférieure à 53 semaines, c’est-à-dire ceux qui se vaccinent avant la fin de la période d’observation. NOTA: cela exclut automatiqument les vaccinés, car dans leur cas, strictement: `(row.exit - row.entry) == Week(53)`
 													if (row.exit - row.entry) < Week(53)
 													)
-	# INFO: ajout de when_what_where_iter dans agenda
-	# Cet agenda agenda est de type Dict{Date, Dict{Date, Vector{Int}}} où :
-	# _when: (première date) quand faire le remplacement: au moment de la vaccination d'un non-vacciné,
-	# _what: (deuxième date) dans quel subgroup faire le remplacement,
-	# _where: (Vector{Int}) dans le subgroup, quels sont les numéros de ligne des non-vaccinés à remplacer.
-	for (_when, _what, _where) in when_what_where_iter # TODO: changer les noms pour filer la métaphore de l'agenda.
-		# INFO: Dans `agenda`: récupère (ou crée si absent) le dictionnaire interne associé à la date de vaccination du non-vacciné (_when).
-		@chain begin # TODO: à mettre dans une fonction pour être réutilisée plus tard.
-			# INFO: Chercher dans le dictionnaire `agenda` la clé `_when`. Si elle existe, retourner la valeur associée (un objet de type `Dict{Date, Vector{Int}}`); si elle n'existe pas, créer une paire `_when => valeur` dont la valeur est un objet vide de type `Dict{Date, Vector{Int}}`, puis retourner cet objet vide. Dans les deux cas, appelons cet objet `inner_dict`.
-			agenda
-			get!(_, _when, Dict{Date,Vector{Int}}()) # TODO: renommer l'objet vide pour être plus explicite
-			# INFO: Chercher dans le dictionnaire `inner_dict` la clé `_what`. Si elle existe, retourner la valeur associée (un objet de type Vector{Int}); si elle n'existe pas, créer une paire `clé => valeur` dont la valeur est un objet vide de type `Vector{Int}`, puis retourner cet objet vide. Dans les deux cas, appelons cet objet `inner_vector` (les lignes à changer, c'est-à-dire les non-vaccinés à remplacer, dans les `group`).
-			get!(_, _what, Int[])
-			# ajouter au vecteur `inner_vector` la valeur `_where`.
-			append!(_, _where)
-			# `agenda` a été mis à jour avec les nouvelles valeurs de `when_what_where_iter`.
-		end
+	for (page_id, task_id, step) in when_what_where_iter
+		write_agenda!(agenda, page_id, task_id, step)
 	end
 	return nothing
 end
@@ -184,37 +169,28 @@ function replace_unvaccinated!(
 		return nothing
 	else
 		eligible = get_eligible(pool, this_monday)
-		for (_what, _where) in agenda[this_monday]
-			if length(eligible) < length(_where)
-				error("$this_monday: Impossible replacement in $(_what)! `eligible` is lesser than `length(_where)`!")
+		for (task_id, task) in agenda[this_monday]
+			if length(eligible) < length(task)
+				error("$this_monday: Impossible replacement in $(task_id)! `eligible` is lesser than `length(task)`!")
 			else
-				selected = sample(eligible, length(_where), replace = false)
+				selected = sample(eligible, length(task), replace = false)
 				for i in selected # INFO: `i` is each element of the `selected` vector.
 					row = pool[i, :] # INFO: select all columns of line `i` of `pool`
-					exit = min(row.dose1_week, _what + Week(53))
+					exit = min(row.dose1_week, task_id + Week(53))
 					pool[i, :availability_week] = exit + Week(1)
 				end
-				subgroup = group[_what]
-				for (k, i) in enumerate(_where) # INFO: `i` have each `_where` value, and `k` is the range of `i` [1, 2, 3...].
+				subgroup = group[task_id]
+				for (k, step) in enumerate(task) # INFO: `step` have each `task` value, and `k` is the range of `step` [1, 2, 3...].
 					s = selected[k] # l'indice d'un individu de remplacement dans pool
-					subgroup_end = _what + Week(53)
-					vaccination_date = pool[s, :dose1_week] # sa date de vaccination (le cas échéant Date(1000,01,01), ce qui représente la non-vaccination)
-					exit = min(subgroup_end, vaccination_date)
+					subgroup_end = task_id + Week(53)
+					page_id = pool[s, :dose1_week] # sa date de vaccination (le cas échéant Date(1000,01,01), ce qui représente la non-vaccination)
+					exit = min(subgroup_end, page_id)
 					death = pool[s, :death_week] # sa date de décès
-					subgroup.exit[i] = exit # mettre la donnée dans subgroup
-					subgroup.death[i] = death # mettre la donnée dans subgroup. Il n'est pas vraiment nécessaire de mettre à jour s'il ne s'agit pas du dernier non-vaccinés...
-					push!(subgroup.DCCI[i], (pool[s, :DCCI], this_monday))
-					if vaccination_date <= subgroup_end # Même chose que dans la fonction `process_first_unvaccinated`. `<=` ?
-						@chain begin # TODO: remplacer par une fonction.
-							# dans agenda (un dictionnaire)
-							agenda
-							# récupérer la valeur de la clé `vaccination_date` (un dictionnaire)
-							get!(_, vaccination_date, Dict{Date,Vector{Int}}())
-							# dans ce dictionnaire, récupérer la valeur de la clé `_what` (un vecteur)
-							get!(_, _what, Int[])
-							# dans ce vecteur, ajouter la valeur de `i`.
-							append!(_, i)
-						end
+					subgroup.exit[step] = exit # mettre la donnée dans subgroup
+					subgroup.death[step] = death # mettre la donnée dans subgroup. Il n'est pas vraiment nécessaire de mettre à jour s'il ne s'agit pas du dernier non-vaccinés...
+					push!(subgroup.DCCI[step], (pool[s, :DCCI], this_monday))
+					if page_id <= subgroup_end # Même chose que dans la fonction `process_first_unvaccinated`. `<=` ?
+						write_agenda!(agenda, page_id, task_id, step)
 					end
 				end
 			end
@@ -229,17 +205,6 @@ function all_weeks_are_selected(
 		)::Bool
 	APPROXIMATE_FIRST_STOPS[group_id] == MAX_FIRST_STOP
 end
-
-# empty_agenda = Dict{Date,Dict{Date,Vector{Int}}}()
-# empty_tasks_list = Dict{Date,Vector{Int}}()
-# empty_tasks = Int[]
-# step = 0
-# @chain begin
-# 	agenda
-# 	get!(_, tasks_list_id, empty_tasks_list)
-# 	get!(_, task_id, empty_task)
-# 	append!(_, step)
-# end
 
 function get_eligible(
 		pool::DataFrame,
@@ -295,10 +260,10 @@ function init_agenda()::Dict{Date,Dict{Date,Vector{Int}}}
 	# step = 0::Int
 	# task = [step]::Vector{Int}
 	# task_id = Date(0, 0, 0)
-	# tasks_list = Dict(task_id => task)
-	# tasks_list_id = Date(0, 0, 0)
-	# agenda = Dict(tasks_list_id => tasks_list)
-	# agenda = Dict(tasks_list_id => Dict(task_id => [step]))
+	# page = Dict(task_id => task)
+	# page_id = Date(0, 0, 0)
+	# agenda = Dict(page_id => page)
+	# agenda = Dict(page_id => Dict(task_id => [step]))
 	agenda = Dict{Date,Dict{Date,Vector{Int}}}()
 end
 
@@ -322,6 +287,24 @@ function try_these_mondays(
 		next_or_previous::Int
 		)::Vector{Date}
 	these_mondays = vcat(ENTRIES[1:next], TAIL)
+end
+
+function write_agenda!(
+		agenda,
+		page_id,
+		task_id,
+		step,
+		)::Nothing
+	# empty_agenda = Dict{Date,Dict{Date,Vector{Int}}}()
+	empty_page = Dict{Date,Vector{Int}}()
+	empty_task = Int[]
+	@chain begin
+		agenda
+		get!(_, page_id, empty_page)
+		get!(_, task_id, empty_task)
+		append!(_, step)
+	end
+	return nothing
 end
 
 # Processing
