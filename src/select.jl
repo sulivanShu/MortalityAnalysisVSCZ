@@ -8,8 +8,8 @@ const APPROXIMATE_FIRST_STOPS = approximate_selection::Dict{Int,Int}
 const DFS = dfs::Dict{Int, DataFrame}
 const MAX_FIRST_STOP = 53
 const TAIL = ENTRIES[54:131]::Vector{Date}
-# global GROUP_ID_VEC = @chain DFS keys collect # sort # Int[] # INFO: Production
-global GROUP_ID_VEC = 11920 # first(GROUP_ID_VEC)::Int # TEST:
+# const GROUP_ID_VEC = @chain DFS keys collect # sort # Int[] # INFO: Production
+const GROUP_ID_VEC = [11920] # first(GROUP_ID_VEC)::Int # TEST:
 
 # Functions
 ## High level functions, sorted in hierarchical order
