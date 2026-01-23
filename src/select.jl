@@ -112,7 +112,9 @@ function process_first_unvaccinated!(
 		vaccinated_count::Int,
 		agenda::Dict{Date,Dict{Date,Vector{Int}}},
 		)::Nothing
-	if vaccinated_count != 0
+	if vaccinated_count == 0
+		return nothing
+	else
 		eligible = get_eligible(pool, this_monday)
 		if length(eligible) < vaccinated_count
 			error("$this_monday: fewer unvaccinated than vaccinated individuals. The select_subgroups function will reduce the number of weeks considered in this group.")
@@ -139,9 +141,9 @@ function process_first_unvaccinated!(
 				pool[i, :availability_week] = exit + Week(1) # une semaine après l'exit. Vérifier.
 			end
 		end
-	end
-	for (page_id, task_id, step) in get_agenda_iterator(subgroup, this_monday)
-		write_agenda!(agenda, page_id, task_id, step)
+		for (page_id, task_id, step) in get_agenda_iterator(subgroup, this_monday)
+			write_agenda!(agenda, page_id, task_id, step)
+		end
 	end
 	return nothing
 end
