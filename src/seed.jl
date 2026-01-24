@@ -1,9 +1,8 @@
-using ArgParse
 settings = ArgParseSettings()
 @add_arg_table settings begin
     "--seed"
         help = "choose a random integer"
-        arg_type = Int
+				arg_type = Union{Int, Nothing}
         default = 0
 end
 parsed_args = parse_args(settings)

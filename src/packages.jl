@@ -1,5 +1,7 @@
 @info "Loading packages"
 
+using ArgParse
+using Base.Threads
 using Blake3Hash
 using Chain
 using CSV

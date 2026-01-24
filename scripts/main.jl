@@ -1,11 +1,10 @@
-# INFO: Current terminal directory. This script must be run from the project's root directory.
+# INFO: This script must be run from the project's root directory.
 root = pwd()
-# INFO: choose your seed just below!
-my_seed = 0
 include(joinpath(root, "src/activate.jl"))
-include(joinpath(root, "src/seed.jl"))
 include(joinpath(root, "src/packages.jl"))
 include(joinpath(root, "src/project.jl"))
+include(joinpath(root, "src/test.jl"))
+include(joinpath(root, "src/seed.jl"))
 include(joinpath(root, "src/constants.jl"))
 include(joinpath(root, "src/download.jl"))
 include(joinpath(root, "src/checksum.jl"))
