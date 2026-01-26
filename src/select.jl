@@ -245,7 +245,8 @@ function get_eligible(
 					## les vivants:
 					this_monday <= row.death_week && # INFO: peuvent mourir la semaine courante de this_monday.
 					## non-vaccinés:
-					this_monday < row.dose1_week && # INFO: doivent être non-vaccinés la semaine courante					## qui ne sont pas encore dans un autre subgroup:
+					this_monday < row.dose1_week && # INFO: doivent être non-vaccinés la semaine courante					
+					## qui ne sont pas encore dans un autre subgroup:
 					row.availability_week <= this_monday, # INFO: était auparavant `<`. Pourtant, plus bas: `pool[i, :availability_week] = exit + Week(1)`, ce qui signifie ces non-vaccinés sont disponibles un peu plus tôt, à partir de la semaine 54 et non 55. Mais est-ce que cela pose problème pour la toute première semaine, où la vaccination commence le dimanche 27 décembre 2020? En principe, non, car cela fait un décalage de 6 + 1.24 jours seulement. Il faut peut-être éclaircir le code au sujet des décalages des jours, car une année fait 52 semaines + 1.24 jours, et les vaccinations sont réputées commencer en milieu de semaines ou en fin en ce qui concerne la toute première semaine.
 					eachrow(pool),
 					)
