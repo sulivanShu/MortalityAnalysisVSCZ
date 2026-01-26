@@ -24,6 +24,10 @@ function select_subgroups(
 			@info "group_id = $group_id\nsubgroups total selection: [1:131]"
 			return group
 		else
+			# are you sure this else case is needed ? 
+			# I feel the only way to get here would be that we got an error when callin create_sbugroups
+			# since we have a catch, I guess we never arrive here ?
+
 			for next = get_next_first_interval_iterator(group_id)
 				try
 					group = create_subgroups(group_id, try_these_mondays(next))
@@ -54,22 +58,25 @@ function create_subgroups(
 		agenda = init_agenda(),
 		)::Dict{Date,DataFrame}
 	pool = get_pool_from(group_id)
-	for this_monday in ALL_MONDAYS
-		if this_monday in these_mondays
-			subgroup = group[this_monday]
-			vaccinated_count = process_vaccinated!(
-																						 pool,
-																						 subgroup,
-																						 this_monday,
-																						 )
-			process_first_unvaccinated!(
-																	pool,
-																	subgroup,
-																	this_monday,
-																	vaccinated_count,
-																	agenda,
-																	)
-		end
+	for this_monday in these_mondays
+		subgroup = group[this_monday]
+		vaccinated_count = process_vaccinated!(
+																					 pool,
+																					 subgroup,
+																					 this_monday,
+																					 )
+
+		# this function edits subgroup
+		# but are we sure group[this_monday] is edited in the exact same way ? 
+		# because in the end what we are returning is group, so we need to ensure it changed
+		process_first_unvaccinated!(
+																pool,
+																subgroup,
+																this_monday,
+																vaccinated_count,
+																agenda,
+																)
+		# same coment here 
 		replace_unvaccinated!(
 													this_monday,
 													pool,
@@ -206,7 +213,7 @@ function get_eligible(
 					## les vivants:
 					this_monday <= row.death_week && # INFO: peuvent mourir la semaine courante de this_monday.
 					## non-vaccinés:
-					this_monday < row.dose1_week && # INFO: doivent être non-vaccinés la semaine courante
+					this_monday < row.dose1_week && # INFO: doivent être non-vaccinés la semaine courante					
 					## qui ne sont pas encore dans un autre subgroup:
 					row.availability_week <= this_monday, # INFO: était auparavant `<`. Pourtant, plus bas: `pool[i, :availability_week] = exit + Week(1)`, ce qui signifie ces non-vaccinés sont disponibles un peu plus tôt, à partir de la semaine 54 et non 55. Mais est-ce que cela pose problème pour la toute première semaine, où la vaccination commence le dimanche 27 décembre 2020? En principe, non, car cela fait un décalage de 6 + 1.24 jours seulement. Il faut peut-être éclaircir le code au sujet des décalages des jours, car une année fait 52 semaines + 1.24 jours, et les vaccinations sont réputées commencer en milieu de semaines ou en fin en ce qui concerne la toute première semaine.
 					eachrow(pool),
