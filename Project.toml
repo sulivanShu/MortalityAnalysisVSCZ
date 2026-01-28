@@ -2,6 +2,7 @@ name = "MortalityAnalysisVSCZ"
 authors = ["sulivanShu"]
 
 [deps]
+ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
 Blake3Hash = "8f478455-a32d-4928-b0e4-72b19a7d5574"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 Chain = "8be319e6-bccf-4806-a6f7-6fae938471bc"
