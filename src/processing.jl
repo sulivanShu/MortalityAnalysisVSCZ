@@ -255,6 +255,7 @@ result = DataFrame(
     key = Int[],
     gross_vaccinated = Float64[],
     standardized_vaccinated = Float64[],
+    ratio = Float64[],
     standardized_unvaccinated = Float64[],
     standardized_ratio = Float64[],
 )
@@ -267,6 +268,7 @@ for (k, df) in processed
             key = k,
             gross_vaccinated = deaths[1],
             standardized_unvaccinated = deaths[2],
+            ratio = deaths[2] / deaths[1],
             standardized_vaccinated = deaths[3],
             standardized_ratio = deaths[2] / deaths[3],
         ),

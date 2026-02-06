@@ -26,7 +26,7 @@ EVA	src/indexing.jl	/^const EVA = Date("10000-01-01")$/;"	c
 FIRST_LAST_WEEK	src/constants.jl	/^const FIRST_LAST_WEEK = CAMPAING_FIRST_WEEK + Week(53)$/;"	c
 FIRST_LAST_WEEK_ADJUSTMENT	src/processing.jl	/^const FIRST_LAST_WEEK_ADJUSTMENT = (7.24+14\/24)\/7$/;"	c
 FIRST_MONDAY	src/constants.jl	/^const FIRST_MONDAY = Date(2020, 12, 21)$/;"	c
-GROUP_ID_VEC	src/select.jl	/^const GROUP_ID_VEC = [11920] # first(GROUP_ID_VEC)::Int[] # TEST:$/;"	c
+GROUP_ID_VEC	src/select.jl	/^const GROUP_ID_VEC = @chain DFS keys collect # sort # Int[] # INFO: Production$/;"	c
 HashCheck	src/checksum.jl	/^function HashCheck(file::AbstractString, b3sum::AbstractString)::Nothing$/;"	f
 LAST_MONDAY	src/constants.jl	/^const LAST_MONDAY = Date(2024, 06, 24)$/;"	c
 MAX_FIRST_STOP	src/select.jl	/^const MAX_FIRST_STOP = 53$/;"	c
